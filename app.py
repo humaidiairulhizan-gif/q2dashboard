@@ -1387,13 +1387,13 @@ if "history" in st.session_state:
                     for axis_name, current_axis_id in selected_axis_ids.items():
 
                         if axis_name.upper().startswith("A"):
-                            color = "#E7F733" #"#2E8B57"
+                            color = "#F7AF33" #"#2E8B57"
 
                         elif axis_name.upper().startswith("H"):
-                            color = "#44FF79" #"#6DC0FA"
+                            color = "#00C337" #"#6DC0FA"
 
                         elif axis_name.upper().startswith("V"):
-                            color = "#6DC0FA" #"#82FFC1"
+                            color = "#56B9FF" #"#82FFC1"
 
                         else:
                             color = "#7F7F7F"
