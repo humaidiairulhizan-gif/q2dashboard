@@ -20,6 +20,16 @@ from database import (
 from dsp import decode_base64_float32, calculate_time_waveform, calculate_fft_metadata
 #from fpdf import FPDF
 
+UNIT_OPTIONS = {
+    "G": 0,
+    "mm/s²": 1,
+    "mm/s": 2,
+    "in/s": 3,
+    "μm": 4,
+    "mils": 5,
+    "GE": 6
+}
+
 # ============================================================
 # PAGE CONFIGURATION
 # ============================================================
@@ -1577,7 +1587,7 @@ if "history" in st.session_state:
                             axis=ax["id"],
                             file_id=file_id,
                             output_type=1,
-                            signal_type=2,
+                            signal_type=fft_signal_type,
                             hz=False
                         )
 
@@ -1588,7 +1598,7 @@ if "history" in st.session_state:
                             axis=ax["id"],
                             file_id=file_id,
                             output_type=2,
-                            signal_type=2,
+                            signal_type=twf_signal_type,
                             hz=False
                         )
 
@@ -1645,7 +1655,15 @@ if "history" in st.session_state:
         # ---------------------------------------------------------
         # TIME WAVEFORM (TWF)
         # ---------------------------------------------------------
-            
+            st.subheader("🌊 Time Waveform (TWF)")
+            twf_unit = st.selectbox(
+                "TWF Unit",
+                list(UNIT_OPTIONS.keys()),
+                index=0,
+                key="twf_unit"
+            )
+            twf_signal_type = UNIT_OPTIONS[twf_unit]
+
             fig_twf = go.Figure()
             first_entry = next(iter(data_dict.values()))
             sr_twf = first_entry["sr_twf"]
@@ -1693,7 +1711,7 @@ if "history" in st.session_state:
 
             fig_twf.update_layout(
                 title=f"<b>{selected_machine_name} - {selected_point_name} - {selected_axis_name} TWF</b>",
-                xaxis_title="Time (s)", yaxis_title="mm/s",
+                xaxis_title="Time (s)", yaxis_title=twf_unit,
                 height=500, template="plotly_white",
                 xaxis=dict(showgrid=True, gridcolor="#e5e5e5", rangeslider=dict(visible=True)),
                 yaxis=dict(showgrid=True, gridcolor="#e5e5e5")
@@ -1703,7 +1721,15 @@ if "history" in st.session_state:
             # ---------------------------------------------------------
             # FFT SPECTRUM
             # ---------------------------------------------------------
-            
+            st.subheader("📊 FFT Spectrum")
+            fft_unit = st.selectbox(
+                "FFT Unit",
+                list(UNIT_OPTIONS.keys()),
+                index=2,
+                key="fft_unit"
+            )
+            fft_signal_type = UNIT_OPTIONS[fft_unit]
+
             fig_fft = go.Figure()
             first_entry = next(iter(data_dict.values()))
             sr_fft = first_entry["sr_fft"]
@@ -1751,7 +1777,7 @@ if "history" in st.session_state:
 
             fig_fft.update_layout(
                 title=f"<b>{selected_machine_name} - {selected_point_name} - {selected_axis_name} FFT</b>",
-                xaxis_title="Hz", yaxis_title="mm/s",
+                xaxis_title="Hz", yaxis_title=fft_unit,
                 height=500, template="plotly_white",
                 xaxis=dict(showgrid=True, gridcolor="#e5e5e5", rangeslider=dict(visible=True)),
                 yaxis=dict(showgrid=True, gridcolor="#e5e5e5")
