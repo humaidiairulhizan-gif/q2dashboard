@@ -949,6 +949,8 @@ if "history" in st.session_state:
             "Measurements",
             f"{len(df):,}"
         )
+
+
     # ========================================================
     # DATA INFORMATION
     # ========================================================
@@ -1729,63 +1731,63 @@ if "history" in st.session_state:
             st.plotly_chart(fig_fft, use_container_width=True)
 
     #
-    if st.button(
-        "📄 Generate Quick Report"
-    ):
+if st.button(
+    "📄 Generate Quick Report"
+):
 
-        report_file = (
-            "Quadrant2_Report.pdf"
+
+    summary = st.session_state.get(
+        "report_summary",
+        {}
+    )
+
+
+    create_report(
+
+        "Quadrant2_Report.pdf",
+
+        {
+
+
+        "Machine":
+        selected_machine_name,
+
+
+        "Point":
+        selected_point_name,
+
+
+        "Axis":
+        selected_axis_name,
+
+
+        "Date Range":
+        f"{start_date} - {end_date}"
+
+
+        },
+
+
+        summary
+
+    )
+
+
+
+    with open(
+        "Quadrant2_Report.pdf",
+        "rb"
+    ) as file:
+
+
+        st.download_button(
+
+            label="⬇️ Download Report",
+
+            data=file,
+
+            file_name="Quadrant2_Report.pdf",
+
+            mime="application/pdf"
+
         )
-
-
-        create_report(
-            report_file,
-
-            {
-
-            "Machine":
-            selected_machine_name,
-
-            "Point":
-            selected_point_name,
-
-            "Date Range":
-            f"{start_date} - {end_date}"
-
-            },
-
-
-            {
-
-            "Velocity RMS":
-            velocity_row["VelRMS"]
-            if velocity_row is not None
-            else "N/A",
-
-
-            "Acceleration RMS":
-            acceleration_row["AccelRMS"]
-            if acceleration_row is not None
-            else "N/A",
-
-
-            "Envelope":
-            envelope_row["EnvRMS"]
-            if envelope_row is not None
-            else "N/A"
-
-            }
-        )
-
-
-        with open(
-            report_file,
-            "rb"
-        ) as f:
-
-
-            st.download_button(
-                "⬇️ Download Report",
-                f,
-                file_name=report_file
-            )

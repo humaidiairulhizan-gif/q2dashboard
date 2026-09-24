@@ -1,8 +1,7 @@
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
-    Spacer,
-    Image
+    Spacer
 )
 
 from reportlab.lib.styles import getSampleStyleSheet
@@ -24,26 +23,33 @@ def create_report(
     styles = getSampleStyleSheet()
 
 
-    story=[]
+    content = []
 
 
-
-    story.append(
+    content.append(
         Paragraph(
-            "Quadrant2 Vibration Report",
+            "Quadrant2 Vibration Monitoring Report",
             styles["Title"]
         )
     )
 
 
-    story.append(
+    content.append(
         Spacer(1,20)
+    )
+
+
+    content.append(
+        Paragraph(
+            "Machine Information",
+            styles["Heading2"]
+        )
     )
 
 
     for key,value in info.items():
 
-        story.append(
+        content.append(
             Paragraph(
                 f"{key}: {value}",
                 styles["Normal"]
@@ -51,12 +57,12 @@ def create_report(
         )
 
 
-    story.append(
+    content.append(
         Spacer(1,20)
     )
 
 
-    story.append(
+    content.append(
         Paragraph(
             "Measurement Summary",
             styles["Heading2"]
@@ -66,7 +72,7 @@ def create_report(
 
     for key,value in summary.items():
 
-        story.append(
+        content.append(
             Paragraph(
                 f"{key}: {value}",
                 styles["Normal"]
@@ -74,4 +80,4 @@ def create_report(
         )
 
 
-    doc.build(story)
+    doc.build(content)
