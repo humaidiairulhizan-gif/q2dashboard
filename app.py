@@ -1812,7 +1812,7 @@ if "history" in st.session_state:
                 try:
                     if pdf.get_y() > 170:
                         pdf.add_page()
-                    twf_path = f"{tmpdir}/twf.png"
+                        twf_path = f"{tmpdir}/twf.png"
                     fig_twf.write_image(twf_path, width=750, height=350, scale=2)
                     pdf.image(twf_path, x=10, y=pdf.get_y(), w=190)
                 except Exception as img_err:
