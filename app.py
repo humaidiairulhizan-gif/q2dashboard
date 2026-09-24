@@ -990,17 +990,26 @@ if "history" in st.session_state:
 
         st.session_state["report_summary"] = {
             "Acceleration RMS":
-            acceleration_row["AccelRMS"]
+            (
+            f"{acceleration_row['AccelRMS']:.5f} "
+            f"{acceleration_row.get('AccelUnit','G')}"
+            )
             if acceleration_row is not None
-            else "N/A",
+            else "N/A"
 
             "Velocity RMS":
-            velocity_row["VelRMS"]
+            (
+            f"{velocity_row['VelRMS']:.3f} "
+            f"{velocity_row.get('VelUnit','mm/s')}"
+            )
             if velocity_row is not None
-            else "N/A",
+            else "N/A"
 
             "Acceleration Envelope":
-            envelope_row["EnvRMS"]
+            (
+            f"{envelope_row['EnvRMS']:.5f} "
+            f"{envelope_row.get('EnvUnit','gE')}"
+            )
             if envelope_row is not None
             else "N/A"
 
@@ -1667,6 +1676,42 @@ if "history" in st.session_state:
             active_row = st.session_state["active_row"]
             rec_date = pd.to_datetime(active_row["Date"]).strftime("%Y/%m/%d")
 
+            # =========================================================
+            # UNIT SELECTION FOR SIGNAL FETCH
+            # =========================================================
+
+            UNIT_OPTIONS = {
+                "G": 0,
+                "mm/s²": 1,
+                "mm/s": 2,
+                "in/s": 3,
+                "μm": 4,
+                "mils": 5,
+                "GE": 6
+            }
+            col_unit1, col_unit2 = st.columns(2)
+
+            with col_unit1:
+
+                twf_unit = st.selectbox(
+                    "TWF Unit",
+                    list(UNIT_OPTIONS.keys()),
+                    index=0,
+                    key="twf_unit_select"
+                )
+
+            with col_unit2:
+
+                fft_unit = st.selectbox(
+                    "FFT Unit",
+                    list(UNIT_OPTIONS.keys()),
+                    index=2,
+                    key="fft_unit_select"
+                )
+
+            twf_signal_type = UNIT_OPTIONS[twf_unit]
+
+            fft_signal_type = UNIT_OPTIONS[fft_unit]
             #tab_fft, tab_twf = st.tabs(["📊 FFT Spectrum", "🌊 Time Waveform (TWF)"])
 
         # ---------------------------------------------------------
