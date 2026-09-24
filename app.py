@@ -666,6 +666,7 @@ if "history" in st.session_state:
     df = st.session_state["history"]
 
 
+
     # ========================================================
     # DATABASE SUMMARY
     # ========================================================
@@ -676,145 +677,262 @@ if "history" in st.session_state:
 
 
     # --------------------------------------------------------
-    # Remove invalid values (-1) when calculating latest
+    # Make sure Date is datetime
     # --------------------------------------------------------
 
-    valid_velocity = df[
-        df["VelRMS"] >= 0
-    ]
-
-
-    valid_acceleration = df[
-        df["AccelRMS"] >= 0
-    ]
-
-
-    valid_envelope = df[
-        df["EnvRMS"] >= 0
-    ]
-
-
-    # --------------------------------------------------------
-    # Latest valid values
-    # --------------------------------------------------------
-
-    latest_velocity = None
-
-    latest_acceleration = None
-
-    latest_envelope = None
-
-    latest_severity = None
-
-
-    if not valid_velocity.empty:
-
-        latest_velocity = (
-            valid_velocity.iloc[-1]
-        )
-
-        latest_severity = (
-            latest_velocity["VelSev"]
-        )
-
-
-    if not valid_acceleration.empty:
-
-        latest_acceleration = (
-            valid_acceleration.iloc[-1]
-        )
-
-
-    if not valid_envelope.empty:
-
-        latest_envelope = (
-            valid_envelope.iloc[-1]
-        )
+    df["Date"] = pd.to_datetime(
+        df["Date"],
+        errors="coerce"
+    )
 
 
     # ========================================================
-    # METRIC CARDS
+    # DETERMINE LATEST MEASUREMENT
     # ========================================================
 
-    c1, c2, c3, c4 = st.columns(4)
+    # Remove rows without a valid timestamp
+    summary_df = df.dropna(
+        subset=["Date"]
+    ).copy()
 
 
-    # --------------------------------------------------------
-    # Velocity RMS
-    # --------------------------------------------------------
+    if summary_df.empty:
 
-    with c1:
+        st.info("No valid measurement data available.")
 
-        if latest_velocity is not None:
+    else:
 
-            st.metric(
-                "Velocity RMS",
-                f"{latest_velocity['VelRMS']:.3f} "
-                f"{latest_velocity['VelUnit']}"
-            )
+        # ----------------------------------------------------
+        # Find the latest measurement timestamp
+        # ----------------------------------------------------
+
+        latest_date = summary_df["Date"].max()
+
+
+        # ----------------------------------------------------
+        # Get all axes belonging to the latest measurement
+        # ----------------------------------------------------
+
+        latest_df = summary_df[
+            summary_df["Date"] == latest_date
+        ].copy()
+
+
+        # ====================================================
+        # ALL AXES
+        # ====================================================
+
+        if selected_axis == "All Axes (A,H,V)":
+
+            # ------------------------------------------------
+            # Velocity RMS
+            # Take the largest valid value from A/H/V
+            # ------------------------------------------------
+
+            valid_velocity = latest_df[
+                latest_df["VelRMS"] >= 0
+            ]
+
+            if not valid_velocity.empty:
+
+                velocity_row = valid_velocity.loc[
+                    valid_velocity["VelRMS"].idxmax()
+                ]
+
+            else:
+
+                velocity_row = None
+
+
+            # ------------------------------------------------
+            # Acceleration RMS
+            # Take the largest valid value from A/H/V
+            # ------------------------------------------------
+
+            valid_acceleration = latest_df[
+                latest_df["AccelRMS"] >= 0
+            ]
+
+            if not valid_acceleration.empty:
+
+                acceleration_row = valid_acceleration.loc[
+                    valid_acceleration["AccelRMS"].idxmax()
+                ]
+
+            else:
+
+                acceleration_row = None
+
+
+            # ------------------------------------------------
+            # Acceleration Envelope
+            # Take the largest valid value from A/H/V
+            # ------------------------------------------------
+
+            valid_envelope = latest_df[
+                latest_df["EnvRMS"] >= 0
+            ]
+
+            if not valid_envelope.empty:
+
+                envelope_row = valid_envelope.loc[
+                    valid_envelope["EnvRMS"].idxmax()
+                ]
+
+            else:
+
+                envelope_row = None
+
+
+        # ====================================================
+        # SINGLE AXIS
+        # ====================================================
 
         else:
 
+            # ------------------------------------------------
+            # Only use the selected axis
+            # ------------------------------------------------
+
+            axis_df = latest_df[
+                latest_df["Axis"] == selected_axis
+            ].copy()
+
+
+            # ------------------------------------------------
+            # Velocity RMS
+            # ------------------------------------------------
+
+            valid_velocity = axis_df[
+                axis_df["VelRMS"] >= 0
+            ]
+
+            if not valid_velocity.empty:
+
+                velocity_row = valid_velocity.iloc[0]
+
+            else:
+
+                velocity_row = None
+
+
+            # ------------------------------------------------
+            # Acceleration RMS
+            # ------------------------------------------------
+
+            valid_acceleration = axis_df[
+                axis_df["AccelRMS"] >= 0
+            ]
+
+            if not valid_acceleration.empty:
+
+                acceleration_row = valid_acceleration.iloc[0]
+
+            else:
+
+                acceleration_row = None
+
+
+            # ------------------------------------------------
+            # Acceleration Envelope
+            # ------------------------------------------------
+
+            valid_envelope = axis_df[
+                axis_df["EnvRMS"] >= 0
+            ]
+
+            if not valid_envelope.empty:
+
+                envelope_row = valid_envelope.iloc[0]
+
+            else:
+
+                envelope_row = None
+
+
+        # ====================================================
+        # METRIC CARDS
+        # ====================================================
+
+        c1, c2, c3, c4 = st.columns(4)
+
+
+        # ----------------------------------------------------
+        # Velocity RMS
+        # ----------------------------------------------------
+
+        with c1:
+
+            if velocity_row is not None:
+
+                st.metric(
+                    "Velocity RMS",
+                    f"{velocity_row['VelRMS']:.3f} "
+                    f"{velocity_row['VelUnit']}"
+                )
+
+            else:
+
+                st.metric(
+                    "Velocity RMS",
+                    "N/A"
+                )
+
+
+        # ----------------------------------------------------
+        # Acceleration RMS
+        # ----------------------------------------------------
+
+        with c2:
+
+            if acceleration_row is not None:
+
+                st.metric(
+                    "Acceleration RMS",
+                    f"{acceleration_row['AccelRMS']:.4f} "
+                    f"{acceleration_row['AccelUnit']}"
+                )
+
+            else:
+
+                st.metric(
+                    "Acceleration RMS",
+                    "N/A"
+                )
+
+
+        # ----------------------------------------------------
+        # Acceleration Envelope
+        # ----------------------------------------------------
+
+        with c3:
+
+            if envelope_row is not None:
+
+                st.metric(
+                    "Acceleration Envelope",
+                    f"{envelope_row['EnvRMS']:.5f} "
+                    f"{envelope_row['EnvUnit']}"
+                )
+
+            else:
+
+                st.metric(
+                    "Acceleration Envelope",
+                    "N/A"
+                )
+
+
+        # ----------------------------------------------------
+        # Number of records
+        # ----------------------------------------------------
+
+        with c4:
+
             st.metric(
-                "Velocity RMS",
-                "N/A"
+                "Measurements",
+                f"{len(df):,}"
             )
-
-
-    # --------------------------------------------------------
-    # Velocity Severity
-    # --------------------------------------------------------
-
-    with c2:
-
-        if latest_severity is not None:
-
-            st.metric(
-                "Velocity Severity",
-                f"{latest_severity:.3f}"
-            )
-
-        else:
-
-            st.metric(
-                "Velocity Severity",
-                "N/A"
-            )
-
-
-    # --------------------------------------------------------
-    # Acceleration RMS
-    # --------------------------------------------------------
-
-    with c3:
-
-        if latest_acceleration is not None:
-
-            st.metric(
-                "Acceleration RMS",
-                f"{latest_acceleration['AccelRMS']:.4f} "
-                f"{latest_acceleration['AccelUnit']}"
-            )
-
-        else:
-
-            st.metric(
-                "Acceleration RMS",
-                "N/A"
-            )
-
-
-    # --------------------------------------------------------
-    # Number of records
-    # --------------------------------------------------------
-
-    with c4:
-
-        st.metric(
-            "Measurements",
-            f"{len(df):,}"
-        )
-
 
     # ========================================================
     # DATA INFORMATION
