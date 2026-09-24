@@ -682,14 +682,13 @@ if "history" in st.session_state:
 
     # ========================================================
     # ========================================================
-    # DATABASE SUMMARY
+    # DATABASE SUMMARY - EI ANALYTICS STYLE
     # ========================================================
 
     st.divider()
+
     st.header("📊 Measurement Summary")
 
-
-    # Ensure Date format
 
     df["Date"] = pd.to_datetime(
         df["Date"],
@@ -698,93 +697,203 @@ if "history" in st.session_state:
 
 
     # ========================================================
-    # 1. VELOCITY RMS
-    # Source:
-    # Latest reading row
-    # FileId NOT required
+    # PREPARE DATA
     # ========================================================
 
-    velocity_df = df.copy()
+    df_numeric = df.copy()
 
 
-    velocity_df["VelRMS"] = pd.to_numeric(
-        velocity_df["VelRMS"],
-        errors="coerce"
+    for col in [
+        "AccelRMS",
+        "VelRMS",
+        "EnvRMS",
+        "FileId"
+    ]:
+
+        if col in df_numeric.columns:
+
+            df_numeric[col] = pd.to_numeric(
+                df_numeric[col],
+                errors="coerce"
+            )
+
+
+    # ========================================================
+    # DETERMINE MODE
+    # ========================================================
+
+    all_axis_mode = (
+        selected_axis_name == "All Axes (A, H, V)"
     )
 
 
-    velocity_df = velocity_df[
-        velocity_df["VelRMS"] >= 0
-    ]
-
-
-    velocity_row = None
-
-
-    if not velocity_df.empty:
-
-        velocity_row = (
-            velocity_df
-            .sort_values("Date")
-            .iloc[-1]
-        )
-
-
 
     # ========================================================
-    # 2. ACCELERATION + ENVELOPE
-    # Source:
-    # Latest valid FileId measurement
+    # SINGLE AXIS MODE
     # ========================================================
 
-    file_df = df[
-        df["FileId"].notna()
-        &
-        (pd.to_numeric(df["FileId"], errors="coerce") > 0)
-    ].copy()
+    if not all_axis_mode:
 
 
-    acceleration_row = None
-    envelope_row = None
+        axis_df = df_numeric[
+            df_numeric["AxisName"]
+            ==
+            selected_axis_name
+        ].copy()
+
+        # Latest reading for velocity
+
+        velocity_df = axis_df[
+            axis_df["VelRMS"] >= 0
+        ]
+
+        velocity_row = None
 
 
-    if not file_df.empty:
+        if not velocity_df.empty:
 
-        latest_file_row = (
-            file_df
-            .sort_values("Date")
-            .iloc[-1]
-        )
+            velocity_row = (
+                velocity_df
+                .sort_values("Date")
+                .iloc[-1]
+            )
 
+        # Latest FileId for acceleration
 
-        if float(
-            latest_file_row["AccelRMS"]
-        ) >= 0:
+        file_df = axis_df[
+            axis_df["FileId"].notna()
+            &
+            (axis_df["FileId"] > 0)
+        ]
 
-            acceleration_row = latest_file_row
-
-
-
-        if float(
-            latest_file_row["EnvRMS"]
-        ) >= 0:
-
-            envelope_row = latest_file_row
+        file_row = None
 
 
+        if not file_df.empty:
+
+            file_row = (
+                file_df
+                .sort_values("Date")
+                .iloc[-1]
+            )
+
+        accel_row = file_row
+
+        env_row = file_row
 
     # ========================================================
-    # DISPLAY CARDS
+    # ALL AXIS MODE
     # ========================================================
 
+    else:
+    # Latest velocity reading from every axis
+        latest_velocity_rows = []
 
+        for axis in df_numeric["AxisName"].unique():
+
+            axis_velocity = df_numeric[
+                (df_numeric["AxisName"] == axis)
+                &
+                (df_numeric["VelRMS"] >= 0)
+            ]
+
+
+            if not axis_velocity.empty:
+
+                latest_velocity_rows.append(
+                    axis_velocity
+                    .sort_values("Date")
+                    .iloc[-1]
+                )
+
+        velocity_row = None
+
+
+        if latest_velocity_rows:
+
+            velocity_candidates = pd.DataFrame(
+                latest_velocity_rows
+            )
+
+
+            velocity_row = (
+                velocity_candidates
+                .loc[
+                    velocity_candidates["VelRMS"]
+                    .idxmax()
+                ]
+            )
+
+        # FileId data only
+
+        file_df = df_numeric[
+            df_numeric["FileId"].notna()
+            &
+            (df_numeric["FileId"] > 0)
+        ]
+
+        accel_row = None
+        env_row = None
+
+        if not file_df.empty:
+
+            valid_accel = file_df[
+                file_df["AccelRMS"] >= 0
+            ]
+
+            valid_env = file_df[
+                file_df["EnvRMS"] >= 0
+            ]
+
+            if not valid_accel.empty:
+
+                accel_row = (
+                    valid_accel
+                    .loc[
+                        valid_accel["AccelRMS"]
+                        .idxmax()
+                    ]
+                )
+
+            if not valid_env.empty:
+
+                env_row = (
+                    valid_env
+                    .loc[
+                        valid_env["EnvRMS"]
+                        .idxmax()
+                    ]
+                )
+
+    # ========================================================
+    # DISPLAY
+    # ========================================================
     c1,c2,c3,c4 = st.columns(4)
 
-
-
-    # Velocity
-
     with c1:
+
+        if accel_row is not None:
+
+            st.metric(
+                "Acceleration RMS",
+                f"{accel_row['AccelRMS']:.5f} "
+                f"{accel_row.get('AccelUnit','G')}"
+            )
+
+            if all_axis_mode:
+
+                st.caption(
+                    f"Axis: {accel_row['AxisName']}"
+                )
+
+        else:
+
+            st.metric(
+                "Acceleration RMS",
+                "N/A"
+            )
+
+    with c2:
 
         if velocity_row is not None:
 
@@ -794,6 +903,13 @@ if "history" in st.session_state:
                 f"{velocity_row.get('VelUnit','mm/s')}"
             )
 
+
+            if all_axis_mode:
+
+                st.caption(
+                    f"Axis: {velocity_row['AxisName']}"
+                )
+
         else:
 
             st.metric(
@@ -801,40 +917,24 @@ if "history" in st.session_state:
                 "N/A"
             )
 
-
-
-    # Acceleration
-
-    with c2:
-
-        if acceleration_row is not None:
-
-            st.metric(
-                "Acceleration RMS",
-                f"{acceleration_row['AccelRMS']:.5f} "
-                f"{acceleration_row.get('AccelUnit','G')}"
-            )
-
-        else:
-
-            st.metric(
-                "Acceleration RMS",
-                "N/A"
-            )
-
-
-
-    # Envelope
-
     with c3:
 
-        if envelope_row is not None:
+
+        if env_row is not None:
+
 
             st.metric(
                 "Acceleration Envelope",
-                f"{envelope_row['EnvRMS']:.5f} "
-                f"{envelope_row.get('EnvUnit','gE')}"
+                f"{env_row['EnvRMS']:.5f} "
+                f"{env_row.get('EnvUnit','gE')}"
             )
+
+
+            if all_axis_mode:
+
+                st.caption(
+                    f"Axis: {env_row['AxisName']}"
+                )
 
         else:
 
@@ -842,10 +942,6 @@ if "history" in st.session_state:
                 "Acceleration Envelope",
                 "N/A"
             )
-
-
-
-    # Measurement count
 
     with c4:
 
@@ -853,19 +949,6 @@ if "history" in st.session_state:
             "Measurements",
             f"{len(df):,}"
         )
-
-
-
-    # Information
-
-    latest_time = df["Date"].max()
-
-
-    st.caption(
-        f"Latest reading: "
-        f"{latest_time.strftime('%Y-%m-%d %H:%M:%S')}"
-    )
-
     # ========================================================
     # DATA INFORMATION
     # ========================================================
