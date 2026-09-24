@@ -1721,12 +1721,12 @@ if "history" in st.session_state:
         # TIME WAVEFORM (TWF)
         # ---------------------------------------------------------
             st.subheader("🌊 Time Waveform (TWF)")
-            twf_unit = st.selectbox(
-                "TWF Unit",
-                list(UNIT_OPTIONS.keys()),
-                index=0,
-                key="twf_unit"
-            )
+            #twf_unit = st.selectbox(
+            #    "TWF Unit",
+            #    list(UNIT_OPTIONS.keys()),
+            #    index=0,
+            #    key="twf_unit"
+            #)
             twf_signal_type = UNIT_OPTIONS[twf_unit]
 
             fig_twf = go.Figure()
@@ -1787,12 +1787,12 @@ if "history" in st.session_state:
             # FFT SPECTRUM
             # ---------------------------------------------------------
             st.subheader("📊 FFT Spectrum")
-            fft_unit = st.selectbox(
-                "FFT Unit",
-                list(UNIT_OPTIONS.keys()),
-                index=2,
-                key="fft_unit"
-            )
+            #fft_unit = st.selectbox(
+            #    "FFT Unit",
+            #    list(UNIT_OPTIONS.keys()),
+            #    index=2,
+            #    key="fft_unit"
+            #)
             fft_signal_type = UNIT_OPTIONS[fft_unit]
 
             fig_fft = go.Figure()
