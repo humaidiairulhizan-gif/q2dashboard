@@ -1646,6 +1646,13 @@ if "history" in st.session_state:
 
                     for ax in axes_to_fetch:
                         # 1. Fetch FFT Spectrum (OutputType=1, SignalTypeOut=2 -> mm/s)
+                        st.write(
+                            "Fetching axis:",
+                            ax["name"],
+                            "ID:",
+                         ax["id"]
+                        )
+
                         fft_resp = api.get_fft_base64(
                             machine_code=machine_code,
                             point_index=point_index,
