@@ -6,3 +6,4 @@ plotly
 python-dotenv
 fpdf2
 kaleido
+reportlab
