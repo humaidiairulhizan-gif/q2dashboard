@@ -843,7 +843,7 @@ if "history" in st.session_state:
                 acceleration_unit = str(
                     acceleration_row.get(
                         "AccelUnit",
-                        "G"
+                        "g"
                     )
                 )
 
