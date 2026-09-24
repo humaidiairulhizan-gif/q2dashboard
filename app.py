@@ -1656,7 +1656,7 @@ if "history" in st.session_state:
                         fft_resp = api.get_fft_base64(
                             machine_code=machine_code,
                             point_index=point_index,
-                            axis=ax["id"],
+                            axis=ax["name"],
                             file_id=file_id,
                             output_type=1,
                             signal_type=fft_signal_type,
@@ -1667,7 +1667,7 @@ if "history" in st.session_state:
                         twf_resp = api.get_fft_base64(
                             machine_code=machine_code,
                             point_index=point_index,
-                            axis=ax["id"],
+                            axis=ax["name"],
                             file_id=file_id,
                             output_type=2,
                             signal_type=twf_signal_type,
@@ -1714,6 +1714,7 @@ if "history" in st.session_state:
                             "TWF RMS:",
                             np.sqrt(np.mean(twf_signal**2))
                         )
+                        st.write(axes)
 
                     st.session_state["fetched_data"] = fetched_data
                     st.session_state["active_file_id"] = file_id
@@ -1800,9 +1801,9 @@ if "history" in st.session_state:
             )
             st.plotly_chart(fig_twf, use_container_width=True)
 
-            fig_twf.write_image(
-            "twf_report.png"
-            ) 
+            #fig_twf.write_image(
+            #"twf_report.png"
+            #) 
 
             # ---------------------------------------------------------
             # FFT SPECTRUM
@@ -1869,9 +1870,9 @@ if "history" in st.session_state:
                 yaxis=dict(showgrid=True, gridcolor="#e5e5e5")
             )
             st.plotly_chart(fig_fft, use_container_width=True)
-            fig_fft.write_image(
-                "fft_report.png"
-            )
+            #fig_fft.write_image(
+            #    "fft_report.png"
+            #)
 
     #generate quick report
     if st.button("📄 Generate Full Report"):
