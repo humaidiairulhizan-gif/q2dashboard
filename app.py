@@ -1704,6 +1704,16 @@ if "history" in st.session_state:
                                 "twf_points": twf_points,
                                 "color": ax["color"]
                             }
+                        fft_signal = decode_base64_float32(val_fft.get("base64", ""))
+                        twf_signal = decode_base64_float32(val_twf.get("base64", ""))
+
+                        st.write(
+                            ax["name"],
+                            "FFT max:",
+                            np.max(fft_signal),
+                            "TWF RMS:",
+                            np.sqrt(np.mean(twf_signal**2))
+                        )
 
                     st.session_state["fetched_data"] = fetched_data
                     st.session_state["active_file_id"] = file_id
@@ -1788,7 +1798,11 @@ if "history" in st.session_state:
                 xaxis=dict(showgrid=True, gridcolor="#e5e5e5", rangeslider=dict(visible=True)),
                 yaxis=dict(showgrid=True, gridcolor="#e5e5e5")
             )
-            st.plotly_chart(fig_twf, use_container_width=True) 
+            st.plotly_chart(fig_twf, use_container_width=True)
+
+            fig_twf.write_image(
+            "twf_report.png"
+            ) 
 
             # ---------------------------------------------------------
             # FFT SPECTRUM
@@ -1855,24 +1869,17 @@ if "history" in st.session_state:
                 yaxis=dict(showgrid=True, gridcolor="#e5e5e5")
             )
             st.plotly_chart(fig_fft, use_container_width=True)
+            fig_fft.write_image(
+                "fft_report.png"
+            )
 
-    #
-    st.divider()
-
-    st.header("📄 Report")
-    if st.button(
-        "Generate Quick Report"
-    ):
-
-        filename = (
-            "Quadrant2_Vibration_Report.pdf"
-        )
+    #generate quick report
+    if st.button("📄 Generate Full Report"):
 
         create_report(
-            filename,
+            "Quadrant2_Full_Report.pdf",
 
             {
-
             "Machine":
             selected_machine_name,
 
@@ -1882,30 +1889,51 @@ if "history" in st.session_state:
             "Axis":
             selected_axis_name,
 
-            "Date Range":
-            f"{start_date} - {end_date}",
-
             "File ID":
-            file_id
+            file_id,
+
+            "Date Range":
+            f"{start_date} - {end_date}"
 
             },
 
-            st.session_state.get(
-                "report_summary",
-                {}
-            )
+            st.session_state["report_summary"],
+
+            {
+
+            "Date":
+            rec_date,
+
+            "Sample Rate":
+            sr_fft,
+
+            "FFT Resolution":
+            fr_val,
+
+            "RPM":
+            rpm_str
+
+            },
+
+            "twf_report.png",
+            "fft_report.png"
 
         )
 
         with open(
-            filename,
+            "Quadrant2_Full_Report.pdf",
             "rb"
-        ) as pdf:
+        ) as f:
 
             st.download_button(
 
-                "Download Report",
-                pdf,
-                filename,
+                "⬇️ Download Full Report",
+                f,
+
+                file_name=
+                "Quadrant2_Full_Report.pdf",
+
+                mime=
                 "application/pdf"
+
             )

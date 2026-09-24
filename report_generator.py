@@ -3,25 +3,36 @@ from reportlab.platypus import (
     Paragraph,
     Spacer,
     Table,
-    TableStyle
+    TableStyle,
+    Image
 )
 
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter
 
 
 
 def create_report(
-        filename,
-        machine_info,
-        summary_data
+    filename,
+    machine_info,
+    summary_data,
+    metadata,
+    twf_image=None,
+    fft_image=None,
+    history=None
 ):
 
-    doc = SimpleDocTemplate(filename)
+    doc = SimpleDocTemplate(
+        filename,
+        pagesize=letter
+    )
 
     styles = getSampleStyleSheet()
 
     content = []
 
+
+    # Title
 
     content.append(
         Paragraph(
@@ -30,11 +41,12 @@ def create_report(
         )
     )
 
-
     content.append(
         Spacer(1,20)
     )
 
+
+    # Machine Information
 
     content.append(
         Paragraph(
@@ -44,28 +56,18 @@ def create_report(
     )
 
 
-    machine_table = []
+    table_data = [
+        [k,str(v)]
+        for k,v in machine_info.items()
+    ]
 
 
-    for k,v in machine_info.items():
-
-        machine_table.append(
-            [
-                k,
-                str(v)
-            ]
-        )
-
-
-    table = Table(machine_table)
-
+    table = Table(table_data)
 
     table.setStyle(
-        TableStyle(
-            [
-                ('GRID',(0,0),(-1,-1),0.5,None)
-            ]
-        )
+        TableStyle([
+            ('GRID',(0,0),(-1,-1),0.5,None)
+        ])
     )
 
 
@@ -77,6 +79,8 @@ def create_report(
     )
 
 
+    # Summary
+
     content.append(
         Paragraph(
             "Measurement Summary",
@@ -85,32 +89,104 @@ def create_report(
     )
 
 
-    summary_table=[]
+    summary_table = Table(
+        [
+            [k,str(v)]
+            for k,v in summary_data.items()
+        ]
+    )
 
 
-    for k,v in summary_data.items():
-
-        summary_table.append(
-            [
-                k,
-                str(v)
-            ]
-        )
+    summary_table.setStyle(
+        TableStyle([
+            ('GRID',(0,0),(-1,-1),0.5,None)
+        ])
+    )
 
 
-    table2 = Table(summary_table)
+    content.append(summary_table)
 
 
-    table2.setStyle(
-        TableStyle(
-            [
-                ('GRID',(0,0),(-1,-1),0.5,None)
-            ]
+    content.append(
+        Spacer(1,20)
+    )
+
+
+    # Metadata
+
+    content.append(
+        Paragraph(
+            "Signal Metadata",
+            styles["Heading2"]
         )
     )
 
 
-    content.append(table2)
+    meta_table = Table(
+        [
+            [k,str(v)]
+            for k,v in metadata.items()
+        ]
+    )
+
+
+    meta_table.setStyle(
+        TableStyle([
+            ('GRID',(0,0),(-1,-1),0.5,None)
+        ])
+    )
+
+
+    content.append(meta_table)
+
+
+
+    # TWF image
+
+    if twf_image:
+
+        content.append(
+            Spacer(1,20)
+        )
+
+        content.append(
+            Paragraph(
+                "Time Waveform",
+                styles["Heading2"]
+            )
+        )
+
+        content.append(
+            Image(
+                twf_image,
+                width=400,
+                height=250
+            )
+        )
+
+
+    # FFT image
+
+    if fft_image:
+
+        content.append(
+            Spacer(1,20)
+        )
+
+        content.append(
+            Paragraph(
+                "FFT Spectrum",
+                styles["Heading2"]
+            )
+        )
+
+        content.append(
+            Image(
+                fft_image,
+                width=400,
+                height=250
+            )
+        )
 
 
     doc.build(content)
