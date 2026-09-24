@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import numpy as np
+import io
+import tempfile
 
 from api import EIAnalyticsAPI
 from database import (
@@ -14,6 +16,7 @@ from database import (
 )
 # At the top of app.py
 from dsp import decode_base64_float32, calculate_time_waveform, calculate_fft_metadata
+from fpdf import FPDF
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -1691,123 +1694,138 @@ if "history" in st.session_state:
             st.plotly_chart(fig_fft, use_container_width=True)
 
     # ============================================================
-    # QUICK REPORT GENERATOR
+    # PDF REPORT ENGINE
+    # ============================================================
+    class Q2ReportPDF(FPDF):
+        def header(self):
+            self.set_font("Helvetica", "B", 14)
+            self.cell(0, 8, "Quadrant2 Vibration Monitoring - Inspection Report", ln=True, align="C")
+            self.set_font("Helvetica", "I", 9)
+            self.cell(0, 5, "EI-Analytics Vibration Measurement Summary", ln=True, align="C")
+            self.ln(4)
+            self.line(10, self.get_y(), 200, self.get_y())
+            self.ln(6)
+
+        def footer(self):
+            self.set_y(-15)
+            self.set_font("Helvetica", "I", 8)
+            self.cell(0, 10, f"Page {self.page_no()} | Confidential - Q2 Analytics Dashboard", align="C")
+
+
+    def create_batch_pdf_report(records_df, fig_fft=None, fig_twf=None):
+        pdf = Q2ReportPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+    
+        # ----------------------------------------------------
+        # COVER / OVERVIEW PAGE
+        # ----------------------------------------------------
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, f"Summary Overview ({len(records_df)} Total Measurements Recorded)", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+    
+        # Summary Table Headers
+        pdf.set_fill_color(230, 230, 230)
+        pdf.cell(35, 7, "Date", border=1, fill=True)
+        pdf.cell(20, 7, "FileID", border=1, fill=True)
+        pdf.cell(15, 7, "Axis", border=1, fill=True)
+        pdf.cell(30, 7, "Vel RMS", border=1, fill=True)
+        pdf.cell(30, 7, "Accel RMS", border=1, fill=True)
+        pdf.cell(30, 7, "Env RMS", border=1, fill=True)
+        pdf.cell(30, 7, "Vel Sev", border=1, fill=True, ln=True)
+
+        # Populate Summary Table Rows (Up to first 25 rows on summary page)
+        pdf.set_font("Helvetica", "", 9)
+        for idx, row in records_df.head(25).iterrows():
+            d_str = str(row.get("Date", "N/A"))[:10]
+            f_id = str(row.get("FileId", "N/A"))
+            axis_str = str(row.get("Axis", "N/A"))
+            v_rms = f"{row.get('VelRMS', 0):.3f}"
+            a_rms = f"{row.get('AccelRMS', 0):.4f}"
+            e_rms = f"{row.get('EnvRMS', 0):.4f}"
+            v_sev = f"{row.get('VelSev', 0):.3f}" if isinstance(row.get('VelSev'), (int, float)) else "N/A"
+
+            pdf.cell(35, 6, d_str, border=1)
+            pdf.cell(20, 6, f_id, border=1)
+            pdf.cell(15, 6, axis_str, border=1)
+            pdf.cell(30, 6, v_rms, border=1)
+            pdf.cell(30, 6, a_rms, border=1)
+            pdf.cell(30, 6, e_rms, border=1)
+            pdf.cell(30, 6, v_sev, border=1, ln=True)
+
+        pdf.ln(8)
+
+        # ----------------------------------------------------
+        # DETAILED PAGES FOR SELECTED RECORD / GRAPHS
+        # ----------------------------------------------------
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Detailed Analysis & Spectral Graphs", ln=True)
+    
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Embed active Plotly graphs if available
+            if fig_fft is not None:
+                fft_path = f"{tmpdir}/fft.png"
+                fig_fft.write_image(fft_path, width=700, height=350, scale=2)
+                pdf.image(fft_path, x=15, y=pdf.get_y(), w=180)
+                pdf.ln(90)
+
+            if fig_twf is not None:
+                if pdf.get_y() > 180:
+                    pdf.add_page()
+                twf_path = f"{tmpdir}/twf.png"
+                fig_twf.write_image(twf_path, width=700, height=350, scale=2)
+                pdf.image(twf_path, x=15, y=pdf.get_y(), w=180)
+
+        return bytes(pdf.output())
+
+
+    # ============================================================
+    # STREAMLIT UI INTEGRATION
     # ============================================================
     st.divider()
     st.header("📄 Quick Inspection Report")
-    st.write("Generate and download an official summary report for the currently selected measurement.")
+    st.write("Generate and download an official summary report for all measurements in your current date filter.")
 
-    # Helper function to generate PDF in memory
-    def create_pdf_report(selected_row, vel_rms, accel_rms, env_rms, fig_fft=None, fig_twf=None):
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Helvetica", "B", 16)
-    
-        # Title / Header
-        pdf.cell(0, 10, "Quadrant2 Vibration Inspection Report", ln=True, align="C")
-        pdf.set_font("Helvetica", "", 10)
-        pdf.cell(0, 6, "EI-Analytics Vibration Monitoring System", ln=True, align="C")
-        pdf.ln(5)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(5)
-
-        # 1. Measurement Details Table
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, "1. Measurement Information", ln=True)
-        pdf.set_font("Helvetica", "", 10)
-    
-        date_str = str(selected_row.get("Date", "N/A"))
-        file_id = str(selected_row.get("FileId", "N/A"))
-        axis = str(selected_row.get("Axis", "N/A"))
-    
-        pdf.cell(95, 6, f"File ID: {file_id}", border=1)
-        pdf.cell(95, 6, f"Date / Time: {date_str}", border=1, ln=True)
-        pdf.cell(95, 6, f"Axis: {axis}", border=1)
-        pdf.cell(95, 6, f"RPM: {selected_row.get('RPM', 'N/A')}", border=1, ln=True)
-        pdf.ln(5)
-
-        # 2. Overall Vibration Summary
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, "2. Overall Vibration Metrics", ln=True)
-        pdf.set_font("Helvetica", "", 10)
-
-        pdf.cell(63, 7, f"Velocity RMS: {vel_rms:.3f} mm/s", border=1)
-        pdf.cell(63, 7, f"Accel RMS: {accel_rms:.4f} G", border=1)
-        pdf.cell(64, 7, f"Env RMS: {env_rms:.4f} GE", border=1, ln=True)
-    
-        vel_sev = selected_row.get("VelSev", "N/A")
-        sev_str = f"{vel_sev:.3f}" if isinstance(vel_sev, (int, float)) else str(vel_sev)
-        pdf.cell(190, 7, f"Velocity Severity Index: {sev_str}", border=1, ln=True)
-        pdf.ln(8)
-
-        # 3. Embed FFT and TWF Graphs into PDF
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, "3. Spectral & Time Waveform Analysis", ln=True)
-    
-        # Save Plotly figures as temp images and place in PDF
-        with tempfile.TemporaryDirectory() as tmpdir:
-            if fig_fft is not None:
-                fft_img_path = f"{tmpdir}/fft.png"
-                fig_fft.write_image(fft_img_path, width=700, height=350, scale=2)
-                pdf.image(fft_img_path, x=15, y=pdf.get_y(), w=180)
-                pdf.ln(85)
-
-            if fig_twf is not None:
-                twf_img_path = f"{tmpdir}/twf.png"
-                fig_twf.write_image(twf_img_path, width=700, height=350, scale=2)
-                pdf.image(twf_img_path, x=15, y=pdf.get_y(), w=180)
-
-        # Footer
-        pdf.set_y(-15)
-        pdf.set_font("Helvetica", "I", 8)
-        pdf.cell(0, 10, f"Report Generated via Q2 Dashboard | {date_str}", align="C")
-
-        # Output as byte array for Streamlit download
-        return bytes(pdf.output())
-
-    # Streamlit UI Controls for Report
     if "history" in st.session_state and not st.session_state["history"].empty:
-        df_report = st.session_state["history"]
+        # Use the filtered history table if user applied date/axis filters, else use full history
+        active_df = st.session_state.get("filtered_history", st.session_state["history"])
     
         col_rep1, col_rep2 = st.columns([2, 1])
     
         with col_rep1:
-            # User selects which FileID/Measurement row to export
-            available_files = df_report["FileId"].dropna().unique()
-            selected_file_id = st.selectbox("Select File ID for Quick Report:", available_files)
-        
+            # Toggle options: All File IDs (Default) or Specific File ID
+            available_files = ["All File IDs in Date Range"] + list(active_df["FileId"].dropna().unique())
+            selected_file_option = st.selectbox("Select File ID scope for report:", available_files)
+
         with col_rep2:
-            st.write(" ") # Spacing
+            st.write(" ")  # Spacing alignment
             st.write(" ")
         
-            # Filter the dataframe for the chosen record
-            selected_record = df_report[df_report["FileId"] == selected_file_id].iloc[0]
-        
-            # Safely pull values
-            v_rms = selected_record.get("VelRMS", 0.0)
-            a_rms = selected_record.get("AccelRMS", 0.0)
-            e_rms = selected_record.get("EnvRMS", 0.0)
+            # Filter target dataset based on user choice
+            if selected_file_option == "All File IDs in Date Range":
+                report_target_df = active_df
+                file_label = "All_Filtered_Records"
+            else:
+                report_target_df = active_df[active_df["FileId"] == selected_file_option]
+                file_label = f"FileID_{selected_file_option}"
 
-            # Pass active Plotly figures if they exist in session state, else None
+            # Fetch active interactive graphs from session state if generated
             active_fft_fig = st.session_state.get("fig_fft", None)
             active_twf_fig = st.session_state.get("fig_twf", None)
 
             try:
-                pdf_bytes = create_pdf_report(
-                    selected_row=selected_record,
-                    vel_rms=v_rms,
-                    accel_rms=a_rms,
-                    env_rms=e_rms,
+                pdf_bytes = create_batch_pdf_report(
+                    records_df=report_target_df,
                     fig_fft=active_fft_fig,
                     fig_twf=active_twf_fig
-                )   
+                )
             
                 st.download_button(
-                    label="📥 Download PDF Report",
+                    label=f"📥 Download Report ({len(report_target_df)} Records)",
                     data=pdf_bytes,
-                    file_name=f"Q2_Report_FileID_{selected_file_id}.pdf",
+                    file_name=f"Q2_Vibration_Report_{file_label}.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 )
             except Exception as e:
-                st.error(f"Unable to generate PDF report: {e}")           
+                st.error(f"Unable to generate PDF report: {e}")      
