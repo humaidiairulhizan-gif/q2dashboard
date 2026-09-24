@@ -6,6 +6,7 @@ import numpy as np
 import io
 import os
 import tempfile
+from report_generator import create_report
 
 from api import EIAnalyticsAPI
 from database import (
@@ -1645,3 +1646,63 @@ if "history" in st.session_state:
             st.plotly_chart(fig_fft, use_container_width=True)
 
     #
+    if st.button(
+        "📄 Generate Quick Report"
+    ):
+
+        report_file = (
+            "Quadrant2_Report.pdf"
+        )
+
+
+        create_report(
+            report_file,
+
+            {
+
+            "Machine":
+            selected_machine_name,
+
+            "Point":
+            selected_point_name,
+
+            "Date Range":
+            f"{start_date} - {end_date}"
+
+            },
+
+
+            {
+
+            "Velocity RMS":
+            velocity_row["VelRMS"]
+            if velocity_row is not None
+            else "N/A",
+
+
+            "Acceleration RMS":
+            acceleration_row["AccelRMS"]
+            if acceleration_row is not None
+            else "N/A",
+
+
+            "Envelope":
+            envelope_row["EnvRMS"]
+            if envelope_row is not None
+            else "N/A"
+
+            }
+        )
+
+
+        with open(
+            report_file,
+            "rb"
+        ) as f:
+
+
+            st.download_button(
+                "⬇️ Download Report",
+                f,
+                file_name=report_file
+            )
