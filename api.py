@@ -39,29 +39,33 @@ class EIAnalyticsAPI:
     # ---------------------------------------------------------
     # LOGIN
     # ---------------------------------------------------------
-    def login(self):
+    def login(self, email, password):
+
         payload = {
-            "email": EMAIL,
-            "password": PASSWORD
+
+            "email": email,
+
+            "password": password
+
         }
 
-        data = self.post("Login", payload)
 
-        # EI API normally returns:
-        # [
-        #   {
-        #       "Key": {...},
-        #       "Value": [...]
-        #   }
-        # ]
+        data = self.post(
+            "Login",
+            payload
+        )
+
 
         try:
+
             self.token = data[0]["Value"][0]["Token"]
+
         except Exception as e:
+
             raise Exception(
-                f"Login succeeded at HTTP level, but token could not "
-                f"be extracted.\nResponse:\n{data}"
+                f"Login failed\n{data}"
             ) from e
+
 
         return data
 
