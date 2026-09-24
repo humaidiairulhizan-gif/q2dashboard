@@ -1,7 +1,9 @@
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
-    Spacer
+    Spacer,
+    Table,
+    TableStyle
 )
 
 from reportlab.lib.styles import getSampleStyleSheet
@@ -9,26 +11,21 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 
 def create_report(
-    filename,
-    info,
-    summary
+        filename,
+        machine_info,
+        summary_data
 ):
 
-
-    doc = SimpleDocTemplate(
-        filename
-    )
-
+    doc = SimpleDocTemplate(filename)
 
     styles = getSampleStyleSheet()
-
 
     content = []
 
 
     content.append(
         Paragraph(
-            "Quadrant2 Vibration Monitoring Report",
+            "Quadrant2 Vibration Dashboard Report",
             styles["Title"]
         )
     )
@@ -47,14 +44,32 @@ def create_report(
     )
 
 
-    for key,value in info.items():
+    machine_table = []
 
-        content.append(
-            Paragraph(
-                f"{key}: {value}",
-                styles["Normal"]
-            )
+
+    for k,v in machine_info.items():
+
+        machine_table.append(
+            [
+                k,
+                str(v)
+            ]
         )
+
+
+    table = Table(machine_table)
+
+
+    table.setStyle(
+        TableStyle(
+            [
+                ('GRID',(0,0),(-1,-1),0.5,None)
+            ]
+        )
+    )
+
+
+    content.append(table)
 
 
     content.append(
@@ -70,14 +85,32 @@ def create_report(
     )
 
 
-    for key,value in summary.items():
+    summary_table=[]
 
-        content.append(
-            Paragraph(
-                f"{key}: {value}",
-                styles["Normal"]
-            )
+
+    for k,v in summary_data.items():
+
+        summary_table.append(
+            [
+                k,
+                str(v)
+            ]
         )
+
+
+    table2 = Table(summary_table)
+
+
+    table2.setStyle(
+        TableStyle(
+            [
+                ('GRID',(0,0),(-1,-1),0.5,None)
+            ]
+        )
+    )
+
+
+    content.append(table2)
 
 
     doc.build(content)
