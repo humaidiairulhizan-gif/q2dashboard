@@ -795,7 +795,7 @@ if "history" in st.session_state:
             # ------------------------------------------------
 
             axis_df = latest_df[
-                latest_df["Axis"] == selected_axis
+                latest_df["AxisName"] == selected_axis
             ].copy()
 
 
