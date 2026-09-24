@@ -670,249 +670,190 @@ if "history" in st.session_state:
 
 
     # ========================================================
+    # ========================================================
     # DATABASE SUMMARY
     # ========================================================
 
     st.divider()
     st.header("📊 Measurement Summary")
 
-    # --------------------------------------------------------
-    # Make sure Date is datetime
-    # --------------------------------------------------------
+
+    # Ensure Date format
 
     df["Date"] = pd.to_datetime(
         df["Date"],
         errors="coerce"
     )
 
-    # --------------------------------------------------------
-    # Only use valid vibration measurements
-    # FileId must exist and be greater than 0
-    # --------------------------------------------------------
 
-    summary_df = df[
+    # ========================================================
+    # 1. VELOCITY RMS
+    # Source:
+    # Latest reading row
+    # FileId NOT required
+    # ========================================================
+
+    velocity_df = df.copy()
+
+
+    velocity_df["VelRMS"] = pd.to_numeric(
+        velocity_df["VelRMS"],
+        errors="coerce"
+    )
+
+
+    velocity_df = velocity_df[
+        velocity_df["VelRMS"] >= 0
+    ]
+
+
+    velocity_row = None
+
+
+    if not velocity_df.empty:
+
+        velocity_row = (
+            velocity_df
+            .sort_values("Date")
+            .iloc[-1]
+        )
+
+
+
+    # ========================================================
+    # 2. ACCELERATION + ENVELOPE
+    # Source:
+    # Latest valid FileId measurement
+    # ========================================================
+
+    file_df = df[
         df["FileId"].notna()
-        & (pd.to_numeric(df["FileId"], errors="coerce") > 0)
-        & df["Date"].notna()
+        &
+        (pd.to_numeric(df["FileId"], errors="coerce") > 0)
     ].copy()
 
-    if summary_df.empty:
 
-        st.info("No valid vibration measurements available.")
+    acceleration_row = None
+    envelope_row = None
 
-    else:
 
-        # ----------------------------------------------------
-        # FIND LATEST VALID MEASUREMENT
-        # ----------------------------------------------------
+    if not file_df.empty:
 
-        latest_date = summary_df["Date"].max()
+        latest_file_row = (
+            file_df
+            .sort_values("Date")
+            .iloc[-1]
+        )
 
-        latest_df = summary_df[
-            summary_df["Date"] == latest_date
-        ].copy()
 
-        # ----------------------------------------------------
-        # SELECT AXIS DATA
-        # ----------------------------------------------------
+        if float(
+            latest_file_row["AccelRMS"]
+        ) >= 0:
 
-        if selected_axis_name == "All Axes (A, H, V)":
+            acceleration_row = latest_file_row
 
-            # Use A, H and V from the latest valid measurement
-            summary_axis_df = latest_df.copy()
+
+
+        if float(
+            latest_file_row["EnvRMS"]
+        ) >= 0:
+
+            envelope_row = latest_file_row
+
+
+
+    # ========================================================
+    # DISPLAY CARDS
+    # ========================================================
+
+
+    c1,c2,c3,c4 = st.columns(4)
+
+
+
+    # Velocity
+
+    with c1:
+
+        if velocity_row is not None:
+
+            st.metric(
+                "Velocity RMS",
+                f"{velocity_row['VelRMS']:.3f} "
+                f"{velocity_row.get('VelUnit','mm/s')}"
+            )
 
         else:
 
-            # Use only the selected axis
-            summary_axis_df = latest_df[
-                summary_df["AxisName"].astype(str)
-                == str(selected_axis_name)
-            ].copy()
-
-        # ----------------------------------------------------
-        # VALID VELOCITY
-        # ----------------------------------------------------
-
-        summary_axis_df["VelRMS"] = pd.to_numeric(
-            summary_axis_df["VelRMS"],
-            errors="coerce"
-        )
-
-        valid_velocity = summary_axis_df[
-            summary_axis_df["VelRMS"] >= 0
-        ].copy()
-
-        # ----------------------------------------------------
-        # VALID ACCELERATION
-        # ----------------------------------------------------
-
-        summary_axis_df["AccelRMS"] = pd.to_numeric(
-            summary_axis_df["AccelRMS"],
-            errors="coerce"
-        )
-
-        valid_acceleration = summary_axis_df[
-            summary_axis_df["AccelRMS"] >= 0
-        ].copy()
-
-        # ----------------------------------------------------
-        # VALID ACCELERATION ENVELOPE
-        # ----------------------------------------------------
-
-        summary_axis_df["EnvRMS"] = pd.to_numeric(
-            summary_axis_df["EnvRMS"],
-            errors="coerce"
-        )
-
-        valid_envelope = summary_axis_df[
-            summary_axis_df["EnvRMS"] >= 0
-        ].copy()
-
-        # ----------------------------------------------------
-        # GET LARGEST VALUE FOR EACH METRIC
-        # ----------------------------------------------------
-
-        velocity_row = None
-        acceleration_row = None
-        envelope_row = None
-
-        if not valid_velocity.empty:
-
-            velocity_row = valid_velocity.loc[
-                valid_velocity["VelRMS"].idxmax()
-            ]
-
-        if not valid_acceleration.empty:
-
-            acceleration_row = valid_acceleration.loc[
-                valid_acceleration["AccelRMS"].idxmax()
-            ]
-
-        if not valid_envelope.empty:
-
-            envelope_row = valid_envelope.loc[
-                valid_envelope["EnvRMS"].idxmax()
-            ]
-
-        # ----------------------------------------------------
-        # METRIC CARDS
-        # ----------------------------------------------------
-
-        c1, c2, c3, c4 = st.columns(4)
-
-        # ----------------------------------------------------
-        # VELOCITY RMS
-        # ----------------------------------------------------
-
-        with c1:
-
-            if velocity_row is not None:
-
-                velocity_value = float(
-                    velocity_row["VelRMS"]
-                )
-
-                velocity_unit = str(
-                    velocity_row.get(
-                        "VelUnit",
-                        "mm/s"
-                    )
-                )
-
-                st.metric(
-                    "Velocity RMS",
-                    f"{velocity_value:.3f} {velocity_unit}"
-                )
-
-            else:
-
-                st.metric(
-                    "Velocity RMS",
-                    "N/A"
-                )
-
-        # ----------------------------------------------------
-        # ACCELERATION RMS
-        # ----------------------------------------------------
-
-        with c2:
-
-            if acceleration_row is not None:
-
-                acceleration_value = float(
-                    acceleration_row["AccelRMS"]
-                )
-
-                acceleration_unit = str(
-                    acceleration_row.get(
-                        "AccelUnit",
-                        "G"
-                    )
-                )
-
-                st.metric(
-                    "Acceleration RMS",
-                    f"{acceleration_value:.4f} {acceleration_unit}"
-                )
-
-            else:
-
-                st.metric(
-                    "Acceleration RMS",
-                    "N/A"
-                )
-
-        # ----------------------------------------------------
-        # ACCELERATION ENVELOPE
-        # ----------------------------------------------------
-
-        with c3:
-
-            if envelope_row is not None:
-
-                envelope_value = float(
-                    envelope_row["EnvRMS"]
-                )
-
-                envelope_unit = str(
-                    envelope_row.get(
-                        "EnvUnit",
-                        "gE"
-                    )
-                )
-
-                st.metric(
-                    "Acceleration Envelope",
-                    f"{envelope_value:.5f} {envelope_unit}"
-                )
-
-            else:
-
-                st.metric(
-                    "Acceleration Envelope",
-                    "N/A"
-                )
-
-        # ----------------------------------------------------
-        # TOTAL MEASUREMENTS
-        # ----------------------------------------------------
-
-        with c4:
-
             st.metric(
-                "Measurements",
-                f"{len(df):,}"
+                "Velocity RMS",
+                "N/A"
             )
 
-        # ----------------------------------------------------
-        # SUMMARY INFORMATION
-        # ----------------------------------------------------
 
-        st.caption(
-            f"Latest valid measurement: "
-            f"{latest_date.strftime('%Y-%m-%d %H:%M:%S')} "
-            f"| Axis selection: {selected_axis_name}"
+
+    # Acceleration
+
+    with c2:
+
+        if acceleration_row is not None:
+
+            st.metric(
+                "Acceleration RMS",
+                f"{acceleration_row['AccelRMS']:.5f} "
+                f"{acceleration_row.get('AccelUnit','G')}"
+            )
+
+        else:
+
+            st.metric(
+                "Acceleration RMS",
+                "N/A"
+            )
+
+
+
+    # Envelope
+
+    with c3:
+
+        if envelope_row is not None:
+
+            st.metric(
+                "Acceleration Envelope",
+                f"{envelope_row['EnvRMS']:.5f} "
+                f"{envelope_row.get('EnvUnit','gE')}"
+            )
+
+        else:
+
+            st.metric(
+                "Acceleration Envelope",
+                "N/A"
+            )
+
+
+
+    # Measurement count
+
+    with c4:
+
+        st.metric(
+            "Measurements",
+            f"{len(df):,}"
         )
+
+
+
+    # Information
+
+    latest_time = df["Date"].max()
+
+
+    st.caption(
+        f"Latest reading: "
+        f"{latest_time.strftime('%Y-%m-%d %H:%M:%S')}"
+    )
 
     # ========================================================
     # DATA INFORMATION
