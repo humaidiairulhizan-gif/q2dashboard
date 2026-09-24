@@ -666,31 +666,42 @@ if "history" in st.session_state:
     df = st.session_state["history"]
 
 
-
-
-
     # ========================================================
     # DATABASE SUMMARY
     # ========================================================
 
-    st.divider()    
+    st.divider()
     st.header("📊 Measurement Summary")
 
+    # --------------------------------------------------------
     # Make sure Date is datetime
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    # --------------------------------------------------------
 
-    # Remove rows without a valid timestamp
-    summary_df = df.dropna(subset=["Date"]).copy()
+    df["Date"] = pd.to_datetime(
+        df["Date"],
+        errors="coerce"
+    )
+
+    # --------------------------------------------------------
+    # Only use valid vibration measurements
+    # FileId must exist and be greater than 0
+    # --------------------------------------------------------
+
+    summary_df = df[
+        df["FileId"].notna()
+        & (pd.to_numeric(df["FileId"], errors="coerce") > 0)
+        & df["Date"].notna()
+    ].copy()
 
     if summary_df.empty:
 
-        st.info("No valid measurement data available.")
+        st.info("No valid vibration measurements available.")
 
     else:
 
-        # --------------------------------------------------------
-        # FIND THE LATEST MEASUREMENT TIMESTAMP
-        # --------------------------------------------------------
+        # ----------------------------------------------------
+        # FIND LATEST VALID MEASUREMENT
+        # ----------------------------------------------------
 
         latest_date = summary_df["Date"].max()
 
@@ -698,98 +709,97 @@ if "history" in st.session_state:
             summary_df["Date"] == latest_date
         ].copy()
 
-        # --------------------------------------------------------
+        # ----------------------------------------------------
         # SELECT AXIS DATA
-        # --------------------------------------------------------
+        # ----------------------------------------------------
 
-        # IMPORTANT:
-        # Use selected_axis_name, NOT selected_axis.
-        #
-        # selected_axis is the API axis dictionary/object.
-        # selected_axis_name is the actual text selected by the user.
+        if selected_axis_name == "All Axes (A, H, V)":
 
-        if selected_axis_name == "All Axes (A,H,V)":
-
-            # Use all A/H/V records at the latest timestamp
+            # Use A, H and V from the latest valid measurement
             summary_axis_df = latest_df.copy()
 
         else:
 
             # Use only the selected axis
             summary_axis_df = latest_df[
-                latest_df["AxisName"].astype(str)
+                summary_df["AxisName"].astype(str)
                 == str(selected_axis_name)
             ].copy()
 
-        # --------------------------------------------------------
-        # FIND LARGEST VALID VALUE FOR EACH METRIC
-        # --------------------------------------------------------
+        # ----------------------------------------------------
+        # VALID VELOCITY
+        # ----------------------------------------------------
 
-        # Velocity
+        summary_axis_df["VelRMS"] = pd.to_numeric(
+            summary_axis_df["VelRMS"],
+            errors="coerce"
+        )
+
         valid_velocity = summary_axis_df[
-            pd.to_numeric(
-                summary_axis_df["VelRMS"],
-                errors="coerce"
-            ) >= 0
+            summary_axis_df["VelRMS"] >= 0
         ].copy()
 
-        # Acceleration
+        # ----------------------------------------------------
+        # VALID ACCELERATION
+        # ----------------------------------------------------
+
+        summary_axis_df["AccelRMS"] = pd.to_numeric(
+            summary_axis_df["AccelRMS"],
+            errors="coerce"
+        )
+
         valid_acceleration = summary_axis_df[
-            pd.to_numeric(
-                summary_axis_df["AccelRMS"],
-                errors="coerce"
-            ) >= 0
+            summary_axis_df["AccelRMS"] >= 0
         ].copy()
 
-        # Acceleration Envelope
+        # ----------------------------------------------------
+        # VALID ACCELERATION ENVELOPE
+        # ----------------------------------------------------
+
+        summary_axis_df["EnvRMS"] = pd.to_numeric(
+            summary_axis_df["EnvRMS"],
+            errors="coerce"
+        )
+
         valid_envelope = summary_axis_df[
-            pd.to_numeric(
-                summary_axis_df["EnvRMS"],
-                errors="coerce"
-            ) >= 0
+            summary_axis_df["EnvRMS"] >= 0
         ].copy()
 
-        # --------------------------------------------------------
-        # GET MAXIMUM VALUE FOR EACH METRIC
-        # --------------------------------------------------------
+        # ----------------------------------------------------
+        # GET LARGEST VALUE FOR EACH METRIC
+        # ----------------------------------------------------
 
         velocity_row = None
         acceleration_row = None
         envelope_row = None
 
         if not valid_velocity.empty:
+
             velocity_row = valid_velocity.loc[
-                pd.to_numeric(
-                    valid_velocity["VelRMS"],
-                    errors="coerce"
-                ).idxmax()
+                valid_velocity["VelRMS"].idxmax()
             ]
 
         if not valid_acceleration.empty:
+
             acceleration_row = valid_acceleration.loc[
-                pd.to_numeric(
-                    valid_acceleration["AccelRMS"],
-                    errors="coerce"
-                ).idxmax()
+                valid_acceleration["AccelRMS"].idxmax()
             ]
 
         if not valid_envelope.empty:
+
             envelope_row = valid_envelope.loc[
-                pd.to_numeric(
-                    valid_envelope["EnvRMS"],
-                    errors="coerce"
-                ).idxmax()
+                valid_envelope["EnvRMS"].idxmax()
             ]
 
-        # --------------------------------------------------------
+        # ----------------------------------------------------
         # METRIC CARDS
-        # --------------------------------------------------------
+        # ----------------------------------------------------
 
         c1, c2, c3, c4 = st.columns(4)
 
-        # --------------------------------------------------------
+        # ----------------------------------------------------
         # VELOCITY RMS
-        # --------------------------------------------------------
+        # ----------------------------------------------------
 
         with c1:
 
@@ -800,7 +810,10 @@ if "history" in st.session_state:
                 )
 
                 velocity_unit = str(
-                    velocity_row.get("VelUnit", "mm/s")
+                    velocity_row.get(
+                        "VelUnit",
+                        "mm/s"
+                    )
                 )
 
                 st.metric(
@@ -815,9 +828,9 @@ if "history" in st.session_state:
                     "N/A"
                 )
 
-        # --------------------------------------------------------
+        # ----------------------------------------------------
         # ACCELERATION RMS
-        # --------------------------------------------------------
+        # ----------------------------------------------------
 
         with c2:
 
@@ -828,7 +841,10 @@ if "history" in st.session_state:
                 )
 
                 acceleration_unit = str(
-                    acceleration_row.get("AccelUnit", "G")
+                    acceleration_row.get(
+                        "AccelUnit",
+                        "G"
+                    )
                 )
 
                 st.metric(
@@ -843,9 +859,9 @@ if "history" in st.session_state:
                     "N/A"
                 )
 
-        # --------------------------------------------------------
+        # ----------------------------------------------------
         # ACCELERATION ENVELOPE
-        # --------------------------------------------------------
+        # ----------------------------------------------------
 
         with c3:
 
@@ -856,7 +872,10 @@ if "history" in st.session_state:
                 )
 
                 envelope_unit = str(
-                    envelope_row.get("EnvUnit", "gE")
+                    envelope_row.get(
+                        "EnvUnit",
+                        "gE"
+                    )
                 )
 
                 st.metric(
@@ -871,9 +890,9 @@ if "history" in st.session_state:
                     "N/A"
                 )
 
-        # --------------------------------------------------------
-        # NUMBER OF MEASUREMENTS
-        # --------------------------------------------------------
+        # ----------------------------------------------------
+        # TOTAL MEASUREMENTS
+        # ----------------------------------------------------
 
         with c4:
 
@@ -882,12 +901,12 @@ if "history" in st.session_state:
                 f"{len(df):,}"
             )
 
-        # --------------------------------------------------------
+        # ----------------------------------------------------
         # SUMMARY INFORMATION
-        # --------------------------------------------------------
+        # ----------------------------------------------------
 
         st.caption(
-            f"Latest measurement: "
+            f"Latest valid measurement: "
             f"{latest_date.strftime('%Y-%m-%d %H:%M:%S')} "
             f"| Axis selection: {selected_axis_name}"
         )
