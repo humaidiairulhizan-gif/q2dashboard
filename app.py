@@ -50,66 +50,35 @@ st.caption(
 # API CONNECTION
 # ============================================================
 
+EI_PASSWORD = os.getenv("EI_PASSWORD")
+
+# Map accounts dynamically from environment variables
 ACCOUNTS = {
-
-    "Phantom":
-    {
-        "email":"phantom@quadrant2.com.my"
-    },
-
-
-    "Wiser3X":
-    {
-        "email":"wiser3x@quadrant2.com.my"
-    },
-
-
-    "Defiant":
-    {
-        "email":"defiant@quadrant2.com.my"
-    }
-
+    "Phantom": {"email": os.getenv("EI_EMAIL_PHANTOM")},
+    "Wiser3X": {"email": os.getenv("EI_EMAIL_WISER3X")},
+    "Defiant": {"email": os.getenv("EI_EMAIL_DEFIANT")},
 }
 
-
-selected_account = st.sidebar.selectbox(
-    "Account",
-    ACCOUNTS.keys()
-)
-
-
-
-EI_PASSWORD = os.getenv(
-    "EI_PASSWORD"
-)
-
-
+selected_account = st.sidebar.selectbox("Account", list(ACCOUNTS.keys()))
 
 @st.cache_resource
-def get_api(email):
-
+def get_api(email, password):
     api = EIAnalyticsAPI()
-
-    api.login(
-        email,
-        EI_PASSWORD
-    )
-
+    api.login(email, password)
     return api
 
+target_email = ACCOUNTS[selected_account]["email"]
+
+if not target_email or not EI_PASSWORD:
+    st.error(f"Missing API credentials for {selected_account}. Check your .env / Secrets.")
+    st.stop()
 
 try:
-    api = get_api(
-        ACCOUNTS[selected_account]["email"]
-    )
-
-
+    # Authenticate with the specific selected account email
+    api = get_api(target_email, EI_PASSWORD)
 except Exception as e:
-
     st.error("Unable to connect to EI-Analytics API.")
-
     st.code(str(e))
-
     st.stop()
 
 
