@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import numpy as np
 import io
+import os
 import tempfile
 
 from api import EIAnalyticsAPI
@@ -49,19 +50,59 @@ st.caption(
 # API CONNECTION
 # ============================================================
 
+ACCOUNTS = {
+
+    "Phantom":
+    {
+        "email":"phantom@quadrant2.com.my"
+    },
+
+
+    "Wiser3X":
+    {
+        "email":"wiser3x@quadrant2.com.my"
+    },
+
+
+    "Defiant":
+    {
+        "email":"defiant@quadrant2.com.my"
+    }
+
+}
+
+
+selected_account = st.sidebar.selectbox(
+    "Account",
+    ACCOUNTS.keys()
+)
+
+
+
+EI_PASSWORD = os.getenv(
+    "EI_PASSWORD"
+)
+
+
+
 @st.cache_resource
-def get_api():
+def get_api(email):
 
     api = EIAnalyticsAPI()
 
-    api.login()
+    api.login(
+        email,
+        EI_PASSWORD
+    )
 
     return api
 
 
 try:
+    api = get_api(
+        ACCOUNTS[selected_account]["email"]
+    )
 
-    api = get_api()
 
 except Exception as e:
 
