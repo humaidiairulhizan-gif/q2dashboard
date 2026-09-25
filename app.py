@@ -1575,6 +1575,22 @@ if "history" in st.session_state:
 
                 st.rerun()
 
+
+        # --------------------------------------------------------
+        # CSV DOWNLOAD
+        # --------------------------------------------------------
+
+        csv = filtered_df.to_csv(
+            index=False
+        ).encode("utf-8")
+
+
+        st.download_button(
+            label="⬇️ Download Historical Data (CSV)",
+            data=csv,
+            file_name="ei_historical_measurements.csv",
+            mime="text/csv"
+        )
         # ========================================================
         # OPEN INVESTIGATION FILES
         # ========================================================
@@ -1637,37 +1653,20 @@ if "history" in st.session_state:
                         )
 
 
-                    st.info(
-                        "FFT/TWF analysis will be connected here later."
-                    )
-
-
                     if st.button(
-                        "❌ Close Investigation",
+                        "❌ Close",
                         key=f"close_{item['fileid']}_{item['axis']}"
                     ):
 
-                        st.session_state["opened_files"].remove(item)
+                        st.session_state["opened_files"].remove(
+                            item
+                        )
 
-                        st.rerun()        
+                        st.rerun()
 
-
-        # --------------------------------------------------------
-        # CSV DOWNLOAD
-        # --------------------------------------------------------
-
-        csv = filtered_df.to_csv(
-            index=False
-        ).encode("utf-8")
-
-
-        st.download_button(
-            label="⬇️ Download Historical Data (CSV)",
-            data=csv,
-            file_name="ei_historical_measurements.csv",
-            mime="text/csv"
-        )
-
+                    # =====================================
+                    # FFT/TWF WILL GO HERE
+                    # =====================================
 
         # --------------------------------------------------------
         # DATA QUALITY
