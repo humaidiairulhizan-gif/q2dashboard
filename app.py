@@ -1553,10 +1553,12 @@ if "history" in st.session_state:
                     "point":
                     selected_point_name,
 
+                    "point_index": int(point_index),
+
                     "machine":
                     selected_machine_name,
 
-                    "machine_code": machine_code
+                    "machine_code": int(machine_code)
 
                 }
 
