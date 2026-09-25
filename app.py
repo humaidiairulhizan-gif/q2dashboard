@@ -1758,7 +1758,11 @@ if "history" in st.session_state:
                         # SIGNAL FETCHING & DYNAMIC ANALYSIS
                         # =========================================================
 
-                        if st.button("📈 Fetch Signal Data", type="primary"):
+                        if st.button(
+                            "📈 Fetch Signal Data",
+                            type="primary",
+                            key=f"fetch_signal_{file_id}_{item['axis']}"
+                        ):
                             with st.spinner("Retrieving TWF and FFT data from EI-Analytics..."):
                                 try:
                                     # ---------------------------------------------------------
