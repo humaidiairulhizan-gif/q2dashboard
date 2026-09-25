@@ -1731,14 +1731,15 @@ if "history" in st.session_state:
 
         with col_sel:
 
-            selected_index = st.selectbox(
-                "Select Measurement File",
-                valid_files_df.index,
-                format_func=lambda i: (
-                    f"FileId {int(valid_files_df.loc[i, 'FileId'])} | "
-                    f"Date: {valid_files_df.loc[i, 'Date']}"
-                )
-            )
+            #selected_index = st.selectbox(
+                #"Select Measurement File",
+                #valid_files_df.index,
+                #format_func=lambda i: (
+                    #f"FileId {int(valid_files_df.loc[i, 'FileId'])} | "
+                    #f"Date: {valid_files_df.loc[i, 'Date']}"
+                #)
+            #)
+            file_id = item["fileid"]
 
         selected_row = valid_files_df.loc[selected_index]
 
