@@ -1551,7 +1551,9 @@ if "history" in st.session_state:
                     selected_point_name,
 
                     "machine":
-                    selected_machine_name
+                    selected_machine_name,
+
+                    "machine_code": machine_code
 
                 }
 
@@ -1675,31 +1677,41 @@ if "history" in st.session_state:
                     st.header("🔬 Spectral & Time Waveform Analysis")
 
                     # 1. Filter valid measurement files
-                    valid_files_df = df[df["FileId"].notna() & (df["FileId"] > 0)].copy()
+                    # 1. Filter valid measurement files
+                    valid_files_df = df[
+                        df["FileId"].notna() &
+                        (df["FileId"] > 0)
+                    ].copy()
 
                     if valid_files_df.empty:
                         st.warning("No valid vibration measurements available for analysis.")
                     else:
-                        # 2. Controls & Variable Definitions
-                        col_sel = st.columns(1)[0]
 
-                        with col_sel:
+                        # =========================================================
+                        # CURRENT INVESTIGATION
+                        # =========================================================
 
-                            #selected_index = st.selectbox(
-                                #"Select Measurement File",
-                                #valid_files_df.index,
-                                #format_func=lambda i: (
-                                    #f"FileId {int(valid_files_df.loc[i, 'FileId'])} | "
-                                    #f"Date: {valid_files_df.loc[i, 'Date']}"
-                                #)
-                            #)
-                            file_id = item["fileid"]
+                        # File ID comes directly from the opened investigation tab
+                        file_id = int(item["fileid"])
 
-                        selected_row = valid_files_df.loc[selected_index]
+                        # Find the corresponding historical row
+                        matching_rows = valid_files_df[
+                            valid_files_df["FileId"] == file_id
+                        ]
 
-                        file_id = int(
-                            selected_row["FileId"]
-                        )
+                        if not matching_rows.empty:
+
+                            selected_row = matching_rows.iloc[0]
+
+                        else:
+
+                            # Create a minimal row if the FileId is not
+                            # available in the current df
+                            selected_row = {
+                                "FileId": file_id,
+                                "Date": item["date"],
+                                "Axis": item["axis"]
+                            }
 
                         # =========================================================
                         # UNIT SELECTION FOR SIGNAL FETCH
@@ -1750,27 +1762,44 @@ if "history" in st.session_state:
                                     # Determine axes for signal analysis
                                     # ---------------------------------------------------------
 
-                                    axes_to_fetch = []
+                                    # ---------------------------------------------------------
+                                    # Determine ONLY the axis opened in this investigation
+                                    # ---------------------------------------------------------
 
-                                    for axis_name, current_axis_id in selected_axis_ids.items():
+                                    axis_name = str(item["axis"]).strip().upper()
 
-                                        if axis_name.upper().startswith("A"):
-                                            color = "#F7AF33" #"#2E8B57"
+                                    # Find the API axis ID
+                                    axis_id = next(
+                                        (
+                                            a["Id"]
+                                            for a in axes
+                                            if str(a["Name"]).strip().upper() == axis_name
+                                        ),
+                                        None
+                                    )
 
-                                        elif axis_name.upper().startswith("H"):
-                                            color = "#00C337" #"#6DC0FA"
+                                    if axis_id is None:
+                                        raise ValueError(
+                                            f"Could not find API axis ID for axis '{axis_name}'"
+                                        )
 
-                                        elif axis_name.upper().startswith("V"):
-                                            color = "#56B9FF" #"#82FFC1"
+                                    # Keep the existing colour scheme
+                                    if axis_name.startswith("A"):
+                                        color = "#F7AF33"
+                                    elif axis_name.startswith("H"):
+                                        color = "#00C337"
+                                    elif axis_name.startswith("V"):
+                                        color = "#56B9FF"
+                                    else:
+                                        color = "#7F7F7F"
 
-                                        else:
-                                            color = "#7F7F7F"
-
-                                        axes_to_fetch.append({
+                                    axes_to_fetch = [
+                                        {
                                             "name": axis_name,
-                                            "id": current_axis_id,
+                                            "id": axis_id,
                                             "color": color
-                                        })
+                                        }
+                                    ]
 
                                     fetched_data = {}
 
