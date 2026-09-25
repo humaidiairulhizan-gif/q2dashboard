@@ -19,6 +19,12 @@ from database import (
 # At the top of app.py
 from dsp import decode_base64_float32, calculate_time_waveform, calculate_fft_metadata
 #from fpdf import FPDF
+# =========================================================
+# OPEN INVESTIGATION FILE STORAGE
+# =========================================================
+
+if "opened_files" not in st.session_state:
+    st.session_state["opened_files"] = []
 
 UNIT_OPTIONS = {
     "G": 0,
@@ -1473,6 +1479,177 @@ if "history" in st.session_state:
             use_container_width=True,
             hide_index=True
         )
+
+        # --------------------------------------------------------
+        # OPEN FILE INVESTIGATION
+        #--------------------------------------------------------
+
+        st.divider()
+
+        st.subheader(
+            "🔍 Open File Investigation"
+        )
+
+
+        if len(filtered_df) > 0:
+
+
+            available_files = filtered_df[
+                [
+                    "FileId",
+                    "Date",
+                    "Axis"
+                ]
+            ].copy()
+
+
+            available_files["Display"] = (
+                available_files["FileId"].astype(str)
+                +
+                " | "
+                +
+                available_files["Axis"].astype(str)
+                +
+                " | "
+                +
+                available_files["Date"].astype(str)
+            )
+
+
+            selected_file_display = st.selectbox(
+                "Select measurement to investigate",
+                available_files["Display"].tolist(),
+                key="investigation_file"
+            )
+
+
+            selected_file_row = available_files[
+                available_files["Display"]
+                ==
+                selected_file_display
+            ].iloc[0]
+
+
+            if st.button(
+                "📂 Open File",
+                key="open_file_button"
+            ):
+
+
+                file_info = {
+
+                    "fileid":
+                    int(selected_file_row["FileId"]),
+
+                    "date":
+                    str(selected_file_row["Date"]),
+
+                    "axis":
+                    selected_file_row["Axis"],
+
+                    "point":
+                    selected_point_name,
+
+                    "machine":
+                    selected_machine_name
+
+                }
+
+                if "opened_files" not in st.session_state:
+
+                    st.session_state["opened_files"] = []
+
+
+                # avoid duplicate
+
+                if file_info not in st.session_state["opened_files"]:
+
+                    st.session_state["opened_files"].append(
+                        file_info
+                    )
+
+
+                st.success(
+                    f"Opened File ID {file_info['fileid']}"
+                )
+
+                st.rerun()
+
+        # ========================================================
+        # OPEN INVESTIGATION FILES
+        # ========================================================
+
+        if "opened_files" in st.session_state and st.session_state["opened_files"]:
+
+            st.divider()
+
+            st.header(
+                "📂 Open Investigations"
+            )
+
+
+            tab_names = []
+
+            for item in st.session_state["opened_files"]:
+
+                tab_names.append(
+                    f"{item['fileid']} - {item['axis']}"
+                )
+
+            tabs = st.tabs(tab_names)
+
+            for tab,item in zip(
+                tabs,
+                st.session_state["opened_files"]
+            ):
+
+                with tab:
+                    st.subheader(
+                        f"File ID {item['fileid']}"
+                    )
+
+                    c1,c2,c3,c4 = st.columns(4)
+
+                    with c1:
+                        st.metric(
+                            "Machine",
+                            item["machine"]
+                        )
+
+                    with c2:
+                        st.metric(
+                            "Point",
+                            item["point"]
+                        )
+
+
+                    with c3:
+                        st.metric(
+                            "Axis",
+                            item["axis"]
+                        )
+
+
+                    with c4:
+                        st.metric(
+                            "File ID",
+                            item["fileid"]
+                        )
+
+
+                    st.info(
+                        "FFT/TWF analysis will be connected here later."
+                    )
+
+
+                    if st.button(
+                        "❌ Close Investigation",
+                        key=f"close_{item['fileid']}_{item['axis']}"
+                    ):
+
+                        st.session_state["opened_files"].remove(item)
+
+                        st.rerun()        
 
 
         # --------------------------------------------------------
