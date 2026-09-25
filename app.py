@@ -1652,11 +1652,12 @@ if "history" in st.session_state:
                             "ID:",
                          ax["id"]
                         )
+                        st.write("Requesting:", ax["name"])
 
                         fft_resp = api.get_fft_base64(
                             machine_code=machine_code,
-                            point_index=point_index,
-                            axis=ax["name"],
+                            point_index=ax["id"], #point_index=point_index
+                            axis=True, #axis=ax["name"]
                             file_id=file_id,
                             output_type=1,
                             signal_type=fft_signal_type,
@@ -1666,8 +1667,8 @@ if "history" in st.session_state:
                         # 2. Fetch Time Waveform (OutputType=2, SignalTypeOut=2 -> mm/s)
                         twf_resp = api.get_fft_base64(
                             machine_code=machine_code,
-                            point_index=point_index,
-                            axis=ax["name"],
+                            point_index=ax["id"], #point_index=point_index
+                            axis=True, #axis=ax["name"]
                             file_id=file_id,
                             output_type=2,
                             signal_type=twf_signal_type,
@@ -1916,8 +1917,8 @@ if "history" in st.session_state:
 
             },
 
-            "twf_report.png",
-            "fft_report.png"
+            #"twf_report.png",
+            #"fft_report.png"
 
         )
 

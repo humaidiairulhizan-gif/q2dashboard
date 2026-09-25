@@ -170,7 +170,7 @@ class EIAnalyticsAPI:
         payload = {
             "OutputType": output_type,
             "SignalTypeOut": signal_type,
-            "axis": axis,
+            "axis": True,
             "fileid": file_id,
             "hz": hz,
             "machinecode": machine_code,
