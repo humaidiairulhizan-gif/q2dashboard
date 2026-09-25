@@ -1495,6 +1495,9 @@ if "history" in st.session_state:
 
 
             available_files = filtered_df[
+                filtered_df["FileId"].notna() &
+                (filtered_df["FileId"] > 0)
+            ][
                 [
                     "FileId",
                     "Date",
@@ -1736,7 +1739,7 @@ if "history" in st.session_state:
                                 "TWF Unit",
                                 list(UNIT_OPTIONS.keys()),
                                 index=0,
-                                key="twf_unit_select"
+                                key=f"twf_unit_select_{file_id}"
                             )
 
                         with col_unit2:
@@ -1745,7 +1748,7 @@ if "history" in st.session_state:
                                 "FFT Unit",
                                 list(UNIT_OPTIONS.keys()),
                                 index=2,
-                                key="fft_unit_select"
+                                key=f"fft_unit_select_{file_id}"
                             )
 
                         twf_signal_type = UNIT_OPTIONS[twf_unit]
@@ -1815,8 +1818,8 @@ if "history" in st.session_state:
 
                                         fft_resp = api.get_fft_base64(
                                             machine_code=machine_code,
-                                            point_index=ax["id"], #point_index=point_index
-                                            axis=True, #axis=ax["name"]
+                                            point_index=item["point_index"], #point_index=point_index
+                                            axis=ax["name"], #axis=ax["name"]
                                             file_id=file_id,
                                             output_type=1,
                                             signal_type=fft_signal_type,
@@ -1826,8 +1829,8 @@ if "history" in st.session_state:
                                         # 2. Fetch Time Waveform (OutputType=2, SignalTypeOut=2 -> mm/s)
                                         twf_resp = api.get_fft_base64(
                                             machine_code=machine_code,
-                                            point_index=ax["id"], #point_index=point_index
-                                            axis=True, #axis=ax["name"]
+                                            point_index=item["point_index"], #point_index=point_index
+                                            axis=ax["name"], #axis=ax["name"]
                                             file_id=file_id,
                                             output_type=2,
                                             signal_type=twf_signal_type,
@@ -1876,9 +1879,8 @@ if "history" in st.session_state:
                                         )
                                         st.write(axes)
 
-                                    st.session_state["fetched_data"] = fetched_data
-                                    st.session_state["active_file_id"] = file_id
-                                    st.session_state["active_row"] = selected_row
+                                    st.session_state[f"fetched_data_{file_id}"] = fetched_data
+                                    st.session_state[f"active_row_{file_id}"] = selected_row
                                     st.success("TWF and FFT data retrieved successfully!")
 
                                 except Exception as e:
@@ -1888,9 +1890,15 @@ if "history" in st.session_state:
                         # RENDERING PLOTS & METADATA OVERLAYS
                         # =========================================================
 
-                        if "fetched_data" in st.session_state and st.session_state.get("active_file_id") == file_id:
-                            data_dict = st.session_state["fetched_data"]
-                            active_row = st.session_state["active_row"]
+                        if f"fetched_data_{file_id}" in st.session_state:
+
+                            data_dict = st.session_state[
+                                f"fetched_data_{file_id}"
+                            ]
+
+                            active_row = st.session_state[
+                                f"active_row_{file_id}"
+                            ]
                             rec_date = pd.to_datetime(active_row["Date"]).strftime("%Y/%m/%d")
 
                             #tab_fft, tab_twf = st.tabs(["📊 FFT Spectrum", "🌊 Time Waveform (TWF)"])
