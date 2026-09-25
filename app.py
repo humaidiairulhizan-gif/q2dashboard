@@ -1883,7 +1883,7 @@ if "history" in st.session_state:
                                             "TWF RMS:",
                                             np.sqrt(np.mean(twf_signal**2))
                                         )
-                                        st.write(axes)
+                                       
 
                                     st.session_state[f"fetched_data_{file_id}"] = fetched_data
                                     st.session_state[f"active_row_{file_id}"] = selected_row
