@@ -1667,6 +1667,343 @@ if "history" in st.session_state:
                     # =====================================
                     # FFT/TWF WILL GO HERE
                     # =====================================
+                    # =========================================================
+                    # SPECTRAL & TIME WAVEFORM ANALYSIS SECTION
+                    # =========================================================
+
+                    st.divider()
+                    st.header("🔬 Spectral & Time Waveform Analysis")
+
+                    # 1. Filter valid measurement files
+                    valid_files_df = df[df["FileId"].notna() & (df["FileId"] > 0)].copy()
+
+                    if valid_files_df.empty:
+                        st.warning("No valid vibration measurements available for analysis.")
+                    else:
+                        # 2. Controls & Variable Definitions
+                        col_sel = st.columns(1)[0]
+
+                        with col_sel:
+
+                            #selected_index = st.selectbox(
+                                #"Select Measurement File",
+                                #valid_files_df.index,
+                                #format_func=lambda i: (
+                                    #f"FileId {int(valid_files_df.loc[i, 'FileId'])} | "
+                                    #f"Date: {valid_files_df.loc[i, 'Date']}"
+                                #)
+                            #)
+                            file_id = item["fileid"]
+
+                        selected_row = valid_files_df.loc[selected_index]
+
+                        file_id = int(
+                            selected_row["FileId"]
+                        )
+
+                        # =========================================================
+                        # UNIT SELECTION FOR SIGNAL FETCH
+                        # =========================================================
+
+                        UNIT_OPTIONS = {
+                            "G": 0,
+                            "mm/s²": 1,
+                            "mm/s": 2,
+                            "in/s": 3,
+                            "μm": 4,
+                            "mils": 5,
+                            "GE": 6
+                        }
+
+                        col_unit1, col_unit2 = st.columns(2)
+
+
+                        with col_unit1:
+
+                            twf_unit = st.selectbox(
+                                "TWF Unit",
+                                list(UNIT_OPTIONS.keys()),
+                                index=0,
+                                key="twf_unit_select"
+                            )
+
+                        with col_unit2:
+
+                            fft_unit = st.selectbox(
+                                "FFT Unit",
+                                list(UNIT_OPTIONS.keys()),
+                                index=2,
+                                key="fft_unit_select"
+                            )
+
+                        twf_signal_type = UNIT_OPTIONS[twf_unit]
+                        fft_signal_type = UNIT_OPTIONS[fft_unit]
+
+                        # =========================================================
+                        # SIGNAL FETCHING & DYNAMIC ANALYSIS
+                        # =========================================================
+
+                        if st.button("📈 Fetch Signal Data", type="primary"):
+                            with st.spinner("Retrieving TWF and FFT data from EI-Analytics..."):
+                                try:
+                                    # ---------------------------------------------------------
+                                    # Determine axes for signal analysis
+                                    # ---------------------------------------------------------
+
+                                    axes_to_fetch = []
+
+                                    for axis_name, current_axis_id in selected_axis_ids.items():
+
+                                        if axis_name.upper().startswith("A"):
+                                            color = "#F7AF33" #"#2E8B57"
+
+                                        elif axis_name.upper().startswith("H"):
+                                            color = "#00C337" #"#6DC0FA"
+
+                                        elif axis_name.upper().startswith("V"):
+                                            color = "#56B9FF" #"#82FFC1"
+
+                                        else:
+                                            color = "#7F7F7F"
+
+                                        axes_to_fetch.append({
+                                            "name": axis_name,
+                                            "id": current_axis_id,
+                                            "color": color
+                                        })
+
+                                    fetched_data = {}
+
+                                    for ax in axes_to_fetch:
+                                        # 1. Fetch FFT Spectrum (OutputType=1, SignalTypeOut=2 -> mm/s)
+                                        st.write(
+                                            "Fetching axis:",
+                                            ax["name"],
+                                            "ID:",
+                                        ax["id"]
+                                        )
+                                        st.write("Requesting:", ax["name"])
+
+                                        fft_resp = api.get_fft_base64(
+                                            machine_code=machine_code,
+                                            point_index=ax["id"], #point_index=point_index
+                                            axis=True, #axis=ax["name"]
+                                            file_id=file_id,
+                                            output_type=1,
+                                            signal_type=fft_signal_type,
+                                            hz=False
+                                        )
+
+                                        # 2. Fetch Time Waveform (OutputType=2, SignalTypeOut=2 -> mm/s)
+                                        twf_resp = api.get_fft_base64(
+                                            machine_code=machine_code,
+                                            point_index=ax["id"], #point_index=point_index
+                                            axis=True, #axis=ax["name"]
+                                            file_id=file_id,
+                                            output_type=2,
+                                            signal_type=twf_signal_type,
+                                            hz=False
+                                        )
+
+                                        if fft_resp and twf_resp:
+                                            val_fft = fft_resp[0].get("Value", {})
+                                            val_twf = twf_resp[0].get("Value", {})
+
+                                            sr_fft = float(val_fft.get("SR", 0))
+                                            sr_twf = float(val_twf.get("SR", 0))
+
+                                            fft_signal = decode_base64_float32(val_fft.get("base64", ""))
+                                            twf_signal = decode_base64_float32(val_twf.get("base64", ""))
+
+                                            # Frequency Axis Construction (Jupyter-verified)
+                                            num_bins = len(fft_signal)
+                                            n_fft = num_bins * 2
+                                            df_step = sr_fft / n_fft if n_fft > 0 else 0
+                                            freq_axis = np.arange(num_bins) * df_step
+
+                                            # Time Axis Construction
+                                            twf_points = len(twf_signal)
+                                            time_axis = np.arange(twf_points) / sr_twf if sr_twf > 0 else np.array([])
+
+                                            fetched_data[ax["name"]] = {
+                                                "fft_signal": fft_signal,
+                                                "freq_axis": freq_axis,
+                                                "twf_signal": twf_signal,
+                                                "time_axis": time_axis,
+                                                "sr_fft": sr_fft,
+                                                "sr_twf": sr_twf,
+                                                "twf_points": twf_points,
+                                                "color": ax["color"]
+                                            }
+                                        fft_signal = decode_base64_float32(val_fft.get("base64", ""))
+                                        twf_signal = decode_base64_float32(val_twf.get("base64", ""))
+
+                                        st.write(
+                                            ax["name"],
+                                            "FFT max:",
+                                            np.max(fft_signal),
+                                            "TWF RMS:",
+                                            np.sqrt(np.mean(twf_signal**2))
+                                        )
+                                        st.write(axes)
+
+                                    st.session_state["fetched_data"] = fetched_data
+                                    st.session_state["active_file_id"] = file_id
+                                    st.session_state["active_row"] = selected_row
+                                    st.success("TWF and FFT data retrieved successfully!")
+
+                                except Exception as e:
+                                    st.error(f"Failed to fetch signal data: {e}")
+
+                        # =========================================================
+                        # RENDERING PLOTS & METADATA OVERLAYS
+                        # =========================================================
+
+                        if "fetched_data" in st.session_state and st.session_state.get("active_file_id") == file_id:
+                            data_dict = st.session_state["fetched_data"]
+                            active_row = st.session_state["active_row"]
+                            rec_date = pd.to_datetime(active_row["Date"]).strftime("%Y/%m/%d")
+
+                            #tab_fft, tab_twf = st.tabs(["📊 FFT Spectrum", "🌊 Time Waveform (TWF)"])
+
+                        # ---------------------------------------------------------
+                        # TIME WAVEFORM (TWF)
+                        # ---------------------------------------------------------
+                            st.subheader("🌊 Time Waveform (TWF)")
+                            #twf_unit = st.selectbox(
+                            #    "TWF Unit",
+                            #    list(UNIT_OPTIONS.keys()),
+                            #    index=0,
+                            #    key="twf_unit"
+                            #)
+                            twf_signal_type = UNIT_OPTIONS[twf_unit]
+
+                            fig_twf = go.Figure()
+                            first_entry = next(iter(data_dict.values()))
+                            sr_twf = first_entry["sr_twf"]
+                            twf_vals = first_entry["twf_signal"]
+                            twf_points = first_entry["twf_points"]
+
+                            # 1. Compute RMS directly from downloaded time series array: sqrt(mean(TWF^2))
+                            if len(twf_vals) > 0:
+                                twf_rms = np.sqrt(np.mean(twf_vals ** 2))
+                                twf_rms_str = f"{twf_rms:.4f}"
+                            else:
+                                twf_rms_str = "N/A"
+
+                            # 2. Compute exact duration: total samples / sampling rate
+                            rec_time = (twf_points / sr_twf) if sr_twf > 0 else 0.0
+
+                            for axis_label, s in data_dict.items():
+                                fig_twf.add_trace(
+                                    go.Scatter(
+                                        x=s["time_axis"],
+                                        y=s["twf_signal"],
+                                        mode="lines",
+                                        name=axis_label,
+                                        line=dict(color=s["color"], width=1.0)
+                                    )
+                                )
+
+                            twf_metadata_lines = [
+                                f"<b>Date: {rec_date}</b>",
+                                f" RMS: {twf_rms_str} ",
+                                "---",
+                                f" SR: {int(round(sr_twf))}",
+                                f" Rec: {rec_time:.1f} S"
+                            ]
+
+                            fig_twf.add_annotation(
+                                xref="paper", yref="paper",
+                                x=0.98, y=0.98,
+                                text="<br>".join(twf_metadata_lines),
+                                showarrow=False, align="left",
+                                bordercolor="#cccccc", borderwidth=1, borderpad=8,
+                                bgcolor="#ffffff", opacity=0.9,
+                                font=dict(size=11, family="monospace", color="black")
+                            )
+
+                            fig_twf.update_layout(
+                                title=f"<b>{selected_machine_name} - {selected_point_name} - {selected_axis_name} TWF</b>",
+                                xaxis_title="Time (s)", yaxis_title=twf_unit,
+                                height=500, template="plotly_white",
+                                xaxis=dict(showgrid=True, gridcolor="#e5e5e5", rangeslider=dict(visible=True)),
+                                yaxis=dict(showgrid=True, gridcolor="#e5e5e5")
+                            )
+                            st.plotly_chart(fig_twf, use_container_width=True)
+
+                            #fig_twf.write_image(
+                            #"twf_report.png"
+                            #) 
+
+                            # ---------------------------------------------------------
+                            # FFT SPECTRUM
+                            # ---------------------------------------------------------
+                            st.subheader("📊 FFT Spectrum")
+                            #fft_unit = st.selectbox(
+                            #    "FFT Unit",
+                            #    list(UNIT_OPTIONS.keys()),
+                            #    index=2,
+                            #    key="fft_unit"
+                            #)
+                            fft_signal_type = UNIT_OPTIONS[fft_unit]
+
+                            fig_fft = go.Figure()
+                            first_entry = next(iter(data_dict.values()))
+                            sr_fft = first_entry["sr_fft"]
+                            fft_vals = first_entry["fft_signal"]
+                            num_bins = len(fft_vals)
+
+                            for axis_label, s in data_dict.items():
+                                fig_fft.add_trace(
+                                    go.Scatter(
+                                        x=s["freq_axis"],
+                                        y=s["fft_signal"],
+                                        mode="lines",
+                                        name=axis_label,
+                                        line=dict(color=s["color"], width=1.2)
+                                    )
+                                )
+                            # 80% usable lines factor
+                            lr_val = int(num_bins * 0.78125) if num_bins > 0 else 12800
+                            fr_val = int(round((num_bins * (sr_fft / (num_bins * 2))))) if sr_fft > 0 else 0
+
+                            # Calculated DIRECTLY from FFT payload array
+                            max_val = np.max(fft_vals) if num_bins > 0 else 0.0
+
+                            rpm_raw = active_row.get("RPM", None)
+                            rpm_str = f"{float(rpm_raw):.0f}" if pd.notna(rpm_raw) and rpm_raw is not None else "N/A"
+
+                            fft_metadata_lines = [                    f"<b>Date: {rec_date}</b>",
+                                f"Max = {max_val:.6f} mm/s",
+                                f"RPM: {rpm_str}",
+                                "---",
+                                f"LR: {lr_val}",
+                                f"FR: {fr_val}",
+                                f"SR: {int(round(sr_fft))}"
+                            ]
+
+                            fig_fft.add_annotation(
+                                xref="paper", yref="paper",
+                                x=0.98, y=0.98,
+                                text="<br>".join(fft_metadata_lines),
+                                showarrow=False, align="left",
+                                bordercolor="#cccccc", borderwidth=1, borderpad=8,
+                                bgcolor="#ffffff", opacity=0.9,
+                                font=dict(size=11, family="monospace", color="black")
+                            )
+
+                            fig_fft.update_layout(
+                                title=f"<b>{selected_machine_name} - {selected_point_name} - {selected_axis_name} FFT</b>",
+                                xaxis_title="Hz", yaxis_title=fft_unit,
+                                height=500, template="plotly_white",
+                                xaxis=dict(showgrid=True, gridcolor="#e5e5e5", rangeslider=dict(visible=True)),
+                                yaxis=dict(showgrid=True, gridcolor="#e5e5e5")
+                            )
+                            st.plotly_chart(fig_fft, use_container_width=True)
+                            #fig_fft.write_image(
+                            #    "fft_report.png"
+                            #)
 
         # --------------------------------------------------------
         # DATA QUALITY
@@ -1713,344 +2050,6 @@ if "history" in st.session_state:
                 f"{valid_envelope:,}"
             )
 
-    # =========================================================
-    # SPECTRAL & TIME WAVEFORM ANALYSIS SECTION
-    # =========================================================
-
-    st.divider()
-    st.header("🔬 Spectral & Time Waveform Analysis")
-
-    # 1. Filter valid measurement files
-    valid_files_df = df[df["FileId"].notna() & (df["FileId"] > 0)].copy()
-
-    if valid_files_df.empty:
-        st.warning("No valid vibration measurements available for analysis.")
-    else:
-        # 2. Controls & Variable Definitions
-        col_sel = st.columns(1)[0]
-
-        with col_sel:
-
-            #selected_index = st.selectbox(
-                #"Select Measurement File",
-                #valid_files_df.index,
-                #format_func=lambda i: (
-                    #f"FileId {int(valid_files_df.loc[i, 'FileId'])} | "
-                    #f"Date: {valid_files_df.loc[i, 'Date']}"
-                #)
-            #)
-            file_id = item["fileid"]
-
-        selected_row = valid_files_df.loc[selected_index]
-
-        file_id = int(
-            selected_row["FileId"]
-        )
-
-        # =========================================================
-        # UNIT SELECTION FOR SIGNAL FETCH
-        # =========================================================
-
-        UNIT_OPTIONS = {
-            "G": 0,
-            "mm/s²": 1,
-            "mm/s": 2,
-            "in/s": 3,
-            "μm": 4,
-            "mils": 5,
-            "GE": 6
-        }
-
-        col_unit1, col_unit2 = st.columns(2)
-
-
-        with col_unit1:
-
-            twf_unit = st.selectbox(
-                "TWF Unit",
-                list(UNIT_OPTIONS.keys()),
-                index=0,
-                key="twf_unit_select"
-            )
-
-        with col_unit2:
-
-            fft_unit = st.selectbox(
-                "FFT Unit",
-                list(UNIT_OPTIONS.keys()),
-                index=2,
-                key="fft_unit_select"
-            )
-
-        twf_signal_type = UNIT_OPTIONS[twf_unit]
-        fft_signal_type = UNIT_OPTIONS[fft_unit]
-
-
-        # =========================================================
-        # SIGNAL FETCHING & DYNAMIC ANALYSIS
-        # =========================================================
-
-        if st.button("📈 Fetch Signal Data", type="primary"):
-            with st.spinner("Retrieving TWF and FFT data from EI-Analytics..."):
-                try:
-                    # ---------------------------------------------------------
-                    # Determine axes for signal analysis
-                    # ---------------------------------------------------------
-
-                    axes_to_fetch = []
-
-                    for axis_name, current_axis_id in selected_axis_ids.items():
-
-                        if axis_name.upper().startswith("A"):
-                            color = "#F7AF33" #"#2E8B57"
-
-                        elif axis_name.upper().startswith("H"):
-                            color = "#00C337" #"#6DC0FA"
-
-                        elif axis_name.upper().startswith("V"):
-                            color = "#56B9FF" #"#82FFC1"
-
-                        else:
-                            color = "#7F7F7F"
-
-                        axes_to_fetch.append({
-                            "name": axis_name,
-                            "id": current_axis_id,
-                            "color": color
-                        })
-
-                    fetched_data = {}
-
-                    for ax in axes_to_fetch:
-                        # 1. Fetch FFT Spectrum (OutputType=1, SignalTypeOut=2 -> mm/s)
-                        st.write(
-                            "Fetching axis:",
-                            ax["name"],
-                            "ID:",
-                         ax["id"]
-                        )
-                        st.write("Requesting:", ax["name"])
-
-                        fft_resp = api.get_fft_base64(
-                            machine_code=machine_code,
-                            point_index=ax["id"], #point_index=point_index
-                            axis=True, #axis=ax["name"]
-                            file_id=file_id,
-                            output_type=1,
-                            signal_type=fft_signal_type,
-                            hz=False
-                        )
-
-                        # 2. Fetch Time Waveform (OutputType=2, SignalTypeOut=2 -> mm/s)
-                        twf_resp = api.get_fft_base64(
-                            machine_code=machine_code,
-                            point_index=ax["id"], #point_index=point_index
-                            axis=True, #axis=ax["name"]
-                            file_id=file_id,
-                            output_type=2,
-                            signal_type=twf_signal_type,
-                            hz=False
-                        )
-
-                        if fft_resp and twf_resp:
-                            val_fft = fft_resp[0].get("Value", {})
-                            val_twf = twf_resp[0].get("Value", {})
-
-                            sr_fft = float(val_fft.get("SR", 0))
-                            sr_twf = float(val_twf.get("SR", 0))
-
-                            fft_signal = decode_base64_float32(val_fft.get("base64", ""))
-                            twf_signal = decode_base64_float32(val_twf.get("base64", ""))
-
-                            # Frequency Axis Construction (Jupyter-verified)
-                            num_bins = len(fft_signal)
-                            n_fft = num_bins * 2
-                            df_step = sr_fft / n_fft if n_fft > 0 else 0
-                            freq_axis = np.arange(num_bins) * df_step
-
-                            # Time Axis Construction
-                            twf_points = len(twf_signal)
-                            time_axis = np.arange(twf_points) / sr_twf if sr_twf > 0 else np.array([])
-
-                            fetched_data[ax["name"]] = {
-                                "fft_signal": fft_signal,
-                                "freq_axis": freq_axis,
-                                "twf_signal": twf_signal,
-                                "time_axis": time_axis,
-                                "sr_fft": sr_fft,
-                                "sr_twf": sr_twf,
-                                "twf_points": twf_points,
-                                "color": ax["color"]
-                            }
-                        fft_signal = decode_base64_float32(val_fft.get("base64", ""))
-                        twf_signal = decode_base64_float32(val_twf.get("base64", ""))
-
-                        st.write(
-                            ax["name"],
-                            "FFT max:",
-                            np.max(fft_signal),
-                            "TWF RMS:",
-                            np.sqrt(np.mean(twf_signal**2))
-                        )
-                        st.write(axes)
-
-                    st.session_state["fetched_data"] = fetched_data
-                    st.session_state["active_file_id"] = file_id
-                    st.session_state["active_row"] = selected_row
-                    st.success("TWF and FFT data retrieved successfully!")
-
-                except Exception as e:
-                    st.error(f"Failed to fetch signal data: {e}")
-
-        # =========================================================
-        # RENDERING PLOTS & METADATA OVERLAYS
-        # =========================================================
-
-        if "fetched_data" in st.session_state and st.session_state.get("active_file_id") == file_id:
-            data_dict = st.session_state["fetched_data"]
-            active_row = st.session_state["active_row"]
-            rec_date = pd.to_datetime(active_row["Date"]).strftime("%Y/%m/%d")
-
-            #tab_fft, tab_twf = st.tabs(["📊 FFT Spectrum", "🌊 Time Waveform (TWF)"])
-
-        # ---------------------------------------------------------
-        # TIME WAVEFORM (TWF)
-        # ---------------------------------------------------------
-            st.subheader("🌊 Time Waveform (TWF)")
-            #twf_unit = st.selectbox(
-            #    "TWF Unit",
-            #    list(UNIT_OPTIONS.keys()),
-            #    index=0,
-            #    key="twf_unit"
-            #)
-            twf_signal_type = UNIT_OPTIONS[twf_unit]
-
-            fig_twf = go.Figure()
-            first_entry = next(iter(data_dict.values()))
-            sr_twf = first_entry["sr_twf"]
-            twf_vals = first_entry["twf_signal"]
-            twf_points = first_entry["twf_points"]
-
-            # 1. Compute RMS directly from downloaded time series array: sqrt(mean(TWF^2))
-            if len(twf_vals) > 0:
-                twf_rms = np.sqrt(np.mean(twf_vals ** 2))
-                twf_rms_str = f"{twf_rms:.4f}"
-            else:
-                twf_rms_str = "N/A"
-
-            # 2. Compute exact duration: total samples / sampling rate
-            rec_time = (twf_points / sr_twf) if sr_twf > 0 else 0.0
-
-            for axis_label, s in data_dict.items():
-                fig_twf.add_trace(
-                    go.Scatter(
-                        x=s["time_axis"],
-                        y=s["twf_signal"],
-                        mode="lines",
-                        name=axis_label,
-                        line=dict(color=s["color"], width=1.0)
-                    )
-                )
-
-            twf_metadata_lines = [
-                f"<b>Date: {rec_date}</b>",
-                f" RMS: {twf_rms_str} ",
-                "---",
-                f" SR: {int(round(sr_twf))}",
-                f" Rec: {rec_time:.1f} S"
-            ]
-
-            fig_twf.add_annotation(
-                xref="paper", yref="paper",
-                x=0.98, y=0.98,
-                text="<br>".join(twf_metadata_lines),
-                showarrow=False, align="left",
-                bordercolor="#cccccc", borderwidth=1, borderpad=8,
-                bgcolor="#ffffff", opacity=0.9,
-                font=dict(size=11, family="monospace", color="black")
-            )
-
-            fig_twf.update_layout(
-                title=f"<b>{selected_machine_name} - {selected_point_name} - {selected_axis_name} TWF</b>",
-                xaxis_title="Time (s)", yaxis_title=twf_unit,
-                height=500, template="plotly_white",
-                xaxis=dict(showgrid=True, gridcolor="#e5e5e5", rangeslider=dict(visible=True)),
-                yaxis=dict(showgrid=True, gridcolor="#e5e5e5")
-            )
-            st.plotly_chart(fig_twf, use_container_width=True)
-
-            #fig_twf.write_image(
-            #"twf_report.png"
-            #) 
-
-            # ---------------------------------------------------------
-            # FFT SPECTRUM
-            # ---------------------------------------------------------
-            st.subheader("📊 FFT Spectrum")
-            #fft_unit = st.selectbox(
-            #    "FFT Unit",
-            #    list(UNIT_OPTIONS.keys()),
-            #    index=2,
-            #    key="fft_unit"
-            #)
-            fft_signal_type = UNIT_OPTIONS[fft_unit]
-
-            fig_fft = go.Figure()
-            first_entry = next(iter(data_dict.values()))
-            sr_fft = first_entry["sr_fft"]
-            fft_vals = first_entry["fft_signal"]
-            num_bins = len(fft_vals)
-
-            for axis_label, s in data_dict.items():
-                fig_fft.add_trace(
-                    go.Scatter(
-                        x=s["freq_axis"],
-                        y=s["fft_signal"],
-                        mode="lines",
-                        name=axis_label,
-                        line=dict(color=s["color"], width=1.2)
-                    )
-                )
-            # 80% usable lines factor
-            lr_val = int(num_bins * 0.78125) if num_bins > 0 else 12800
-            fr_val = int(round((num_bins * (sr_fft / (num_bins * 2))))) if sr_fft > 0 else 0
-
-            # Calculated DIRECTLY from FFT payload array
-            max_val = np.max(fft_vals) if num_bins > 0 else 0.0
-
-            rpm_raw = active_row.get("RPM", None)
-            rpm_str = f"{float(rpm_raw):.0f}" if pd.notna(rpm_raw) and rpm_raw is not None else "N/A"
-
-            fft_metadata_lines = [                    f"<b>Date: {rec_date}</b>",
-                f"Max = {max_val:.6f} mm/s",
-                f"RPM: {rpm_str}",
-                "---",
-                f"LR: {lr_val}",
-                f"FR: {fr_val}",
-                f"SR: {int(round(sr_fft))}"
-            ]
-
-            fig_fft.add_annotation(
-                xref="paper", yref="paper",
-                x=0.98, y=0.98,
-                text="<br>".join(fft_metadata_lines),
-                showarrow=False, align="left",
-                bordercolor="#cccccc", borderwidth=1, borderpad=8,
-                bgcolor="#ffffff", opacity=0.9,
-                font=dict(size=11, family="monospace", color="black")
-            )
-
-            fig_fft.update_layout(
-                title=f"<b>{selected_machine_name} - {selected_point_name} - {selected_axis_name} FFT</b>",
-                xaxis_title="Hz", yaxis_title=fft_unit,
-                height=500, template="plotly_white",
-                xaxis=dict(showgrid=True, gridcolor="#e5e5e5", rangeslider=dict(visible=True)),
-                yaxis=dict(showgrid=True, gridcolor="#e5e5e5")
-            )
-            st.plotly_chart(fig_fft, use_container_width=True)
-            #fig_fft.write_image(
-            #    "fft_report.png"
-            #)
 
     #generate quick report
     if st.button("📄 Generate Full Report"):
