@@ -1794,7 +1794,7 @@ if "history" in st.session_state:
 
                                     # Keep the existing colour scheme
                                     if axis_name.startswith("A"):
-                                        color = "#F7AF33"
+                                        color = "#F733E7"
                                     elif axis_name.startswith("H"):
                                         color = "#00C337"
                                     elif axis_name.startswith("V"):
